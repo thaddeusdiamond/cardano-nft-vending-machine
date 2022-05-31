@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=62.3.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cardano-vending-machine"
+version = "0.1.0-beta2"
+description = "Library to perform NFT mints on the Cardano blockchain"
+
+requires-python = ">=3.8"
+
+dependencies = [
+  "argparse>=1.4.0",
+  "requests>=2.27.1"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"] 
+include = ["cardano*"] 
+exclude = ["cardano.tests*"] 
+namespaces = false
