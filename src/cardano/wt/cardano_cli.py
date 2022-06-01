@@ -9,7 +9,6 @@ cardano-cli *nix script representation in Python
 """
 class CardanoCli(object):
 
-    _PPARAMS_FILE = 'protocol.json'
     _WITNESS_COUNT = 1
 
     _MAINNET_PARAM = '--mainnet'
@@ -17,8 +16,9 @@ class CardanoCli(object):
 
     TXN_DIR = 'txn'
 
-    def __init__(self, mainnet=False):
-        self.__mainnet = mainnet
+    def __init__(self, mainnet=False, protocol_params=None):
+        self.mainnet = mainnet
+        self.protocol_params = protocol_params
 
     def __run_script(self, cardano_args, add_network=True):
         cmd = f'cardano-cli {cardano_args} {self.__get_network_flag() if add_network else ""}'
@@ -30,7 +30,10 @@ class CardanoCli(object):
         return out
 
     def __get_network_flag(self):
-       return self._MAINNET_PARAM if self.__mainnet else self._TESTNET_PARAM
+       return self._MAINNET_PARAM if self.mainnet else self._TESTNET_PARAM
+
+    def named_asset_str(nft_policy, nft_names):
+        return '+'.join(['.'.join([f"1 {nft_policy}", nft_name]) for nft_name in nft_names])
 
     def get_utxos(self, address, exclusions):
         output = self.__run_script(f'query utxo --address {address}') 
@@ -54,7 +57,8 @@ class CardanoCli(object):
         return build_file
 
     def build_mint_txn(self, output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, mint, nft_names): 
-        mint_args = [f"--mint='{nfts_as_cli(nft_names, mint)}'", f"--minting-script-file {mint.script}"] if nft_names else []
+        named_asset_str = CardanoCli.named_asset_str(selfmint.policy, nft_names)
+        mint_args = [f"--mint='{named_asset_str}'", f"--minting-script-file {mint.script}"] if nft_names else []
         return self.build_txn(output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, mint_args)
 
     def build_raw_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, addl_args):
@@ -67,13 +71,14 @@ class CardanoCli(object):
         return raw_build_file
     
     def build_raw_mint_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint, nft_names): 
-        mint_args = [f"--mint='{nfts_as_cli(nft_names, mint)}'", f"--minting-script-file {mint.script}"] if nft_names else []
+        named_asset_str = CardanoCli.named_asset_str(mint.policy, nft_names)
+        mint_args = [f"--mint='{named_asset_str}'", f"--minting-script-file {mint.script}"] if nft_names else []
         return self.build_raw_txn(output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint_args)
    
     def calculate_min_fee(self, raw_build_file, tx_in_count, tx_out_count, witness_count):
         lovelace_fee_str = self.__run_script(
             f'transaction calculate-min-fee --tx-body-file {raw_build_file} --tx-in-count {tx_in_count} \
-              --tx-out-count {tx_out_count} --witness-count {witness_count} --protocol-params-file {self._PPARAMS_FILE}' 
+              --tx-out-count {tx_out_count} --witness-count {witness_count} --protocol-params-file {self.protocol_params}' 
         )
         return int(lovelace_fee_str.split(' ')[0])
 
