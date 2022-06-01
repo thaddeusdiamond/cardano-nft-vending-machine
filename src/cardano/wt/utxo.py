@@ -10,7 +10,7 @@ class Utxo(object):
 
         def __init__(self, lovelace, policy):
             self.lovelace = lovelace
-            self.policy = policy if policy else Balance.LOVELACE_POLICY
+            self.policy = policy if policy else Utxo.Balance.LOVELACE_POLICY
 
         def __repr__(self):
             return f"{self.lovelace} {self.policy}"
