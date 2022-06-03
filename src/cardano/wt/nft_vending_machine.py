@@ -59,8 +59,7 @@ class NftVendingMachine(object):
     def __do_vend(self, mint_req, output_dir, locked_subdir, metadata_subdir):
         available_mints = os.listdir(self.mint.nfts_dir)
         if not available_mints:
-            print("Metadata directory is empty, please restock the vending machine...")
-            return
+            print("WARNING: Metadata directory is empty, please restock the vending machine...")
 
         input_addr = self.blockfrost_api.get_input_address(mint_req.hash)
         lovelace_bals = [balance for balance in mint_req.balances if balance.policy == Utxo.Balance.LOVELACE_POLICY]
