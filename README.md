@@ -41,7 +41,6 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 --mint-script /FULL/PATH/TO/policy.script \
                 --mint-sign-key /FULL/PATH/TO/policy.skey \
                 --mint-policy $(cat /FULL/PATH/TO/policyID) \
-                --protocol-params /FULL/PATH/TO/protocol.json \
                 --blockfrost-project <BLOCKFROST_PROJECT_ID> \
                 --metadata-dir metadata/ \
                 --output-dir output/

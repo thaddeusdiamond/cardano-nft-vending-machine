@@ -56,6 +56,9 @@ class BlockfrostApi(object):
             available_utxos.add(utxo)
         return available_utxos
 
+    def get_protocol_parameters(self):
+        return self.__call_get_api('epochs/latest/parameters')
+
     def submit_txn(self, signed_file):
         with open(signed_file, 'r') as signed_filehandle:
             tx_cbor = json.load(signed_filehandle)['cborHex']

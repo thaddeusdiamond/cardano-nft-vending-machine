@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 import os
 import signal
 import time
@@ -9,6 +10,30 @@ from cardano.wt.blockfrost import BlockfrostApi
 from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.mint import Mint
 from cardano.wt.nft_vending_machine import NftVendingMachine
+
+# Blockfrost gives the wrong format back for protocol parameters so here's a translator
+BLOCKFROST_PROTOCOL_TRANSLATOR = {
+    'decentralization': 'decentralisation_param',
+    'extraPraosEntropy': 'extra_entropy',
+    'maxBlockBodySize': 'max_block_size',
+    'maxBlockHeaderSize': 'max_block_header_size',
+    'minPoolCost': 'min_pool_cost',
+    'maxTxSize': 'max_tx_size',
+    'minUTxOValue': 'min_utxo',
+    'monetaryExpansion': 'rho',
+    'poolPledgeInfluence': 'a0',
+    'poolRetireMaxEpoch': 'e_max', 
+    'protocolVersion': {
+        'minor': 'protocol_minor_ver',
+        'major': 'protocol_major_ver'
+    },
+    'stakeAddressDeposit': 'key_deposit',
+    'stakePoolDeposit': 'pool_deposit',
+    'stakePoolTargetNum': 'n_opt',
+    'treasuryCut': 'tau',
+    'txFeeFixed': 'min_fee_b',
+    'txFeePerByte': 'min_fee_a'
+}
 
 # Vending machine internal constants (global required)
 LOCKED_SUBDIR = 'in_proc'
@@ -29,6 +54,27 @@ def ensure_output_dirs_made(output_dir):
     os.makedirs(os.path.join(output_dir, METADATA_SUBDIR), exist_ok=True)
     os.makedirs(os.path.join(output_dir, CardanoCli.TXN_DIR), exist_ok=True)
 
+def generate_cardano_cli_protocol(translator, blockfrost_input):
+    translated = {}
+    for entry in translator:
+        translation = translator[entry]
+        if type(translation) is dict:
+            translated[entry] = generate_cardano_cli_protocol(translation, blockfrost_input)
+        else:
+            input_val = blockfrost_input[translation]
+            if type(input_val) is str and input_val.isdigit():
+                translated[entry] = int(input_val)
+            else:
+                translated[entry] = input_val
+    return translated
+
+def rewritten_protocol_params(blockfrost_protocol_json, output_dir):
+    cardanocli_protocol_json = generate_cardano_cli_protocol(BLOCKFROST_PROTOCOL_TRANSLATOR, blockfrost_protocol_json)
+    protocol_filename = os.path.join(output_dir, 'protocol.json')
+    with open(protocol_filename, 'w') as protocol_file:
+        json.dump(cardanocli_protocol_json, protocol_file)
+    return protocol_filename
+
 def get_donation_amt(do_not_donate):
     return 0 if do_not_donate else 1000000
 
@@ -42,7 +88,6 @@ def get_parser():
     parser.add_argument('--mint-policy', required=True, help='Policy ID of the mint being performed')
     parser.add_argument('--mint-script', required=True, help='Local path of scripting file for mint')
     parser.add_argument('--mint-sign-key', required=True, help='Location on disk of signing keys used for the mint')
-    parser.add_argument('--protocol-params', required=True, help='Path to the protocol.json file for the network')
     parser.add_argument('--metadata-dir', required=True, help='Local folder where Cardano NFT metadata (e.g., 721s) are stored')
     parser.add_argument('--output-dir', required=True, help='Local folder where vending machine output stored')
     parser.add_argument('--blockfrost-project', required=True, help='Blockfrost project ID to use for retrieving chain data')
@@ -53,14 +98,18 @@ def get_parser():
 if __name__ == "__main__":
     _args = get_parser().parse_args()
 
-    _donation_amt = get_donation_amt(_args.no_donation)
-    _mint = Mint(_args.mint_policy, _args.mint_price, _args.mint_rebate, _donation_amt, _args.metadata_dir, _args.mint_script, _args.mint_sign_key)
-    _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet)
-    _cardano_cli = CardanoCli(mainnet=_args.mainnet, protocol_params=_args.protocol_params)
-    _nft_vending_machine = NftVendingMachine(_args.payment_addr, _args.payment_sign_key, _args.profit_addr, _mint, _blockfrost_api, _cardano_cli, mainnet=_args.mainnet)
-
     set_interrupt_signal(end_program)
     ensure_output_dirs_made(_args.output_dir)
+
+    _donation_amt = get_donation_amt(_args.no_donation)
+    _mint = Mint(_args.mint_policy, _args.mint_price, _args.mint_rebate, _donation_amt, _args.metadata_dir, _args.mint_script, _args.mint_sign_key)
+
+    _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet)
+
+    _protocol_params = rewritten_protocol_params(_blockfrost_api.get_protocol_parameters(), _args.output_dir)
+    _cardano_cli = CardanoCli(mainnet=_args.mainnet, protocol_params=_protocol_params)
+
+    _nft_vending_machine = NftVendingMachine(_args.payment_addr, _args.payment_sign_key, _args.profit_addr, _mint, _blockfrost_api, _cardano_cli, mainnet=_args.mainnet)
 
     exclusions = set()
     while _program_is_running:
