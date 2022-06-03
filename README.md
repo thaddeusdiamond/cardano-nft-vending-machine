@@ -32,20 +32,19 @@ The library consists of several Python objects representing the mint process.  T
 ### ``cardano_vending_machine.py``
 There is a sample vending machine script that is included in the ``src/`` directory to show how to invoke the library components.  Use ``-h`` to see detailed help or use a command like below:
 
-    CARDANO_NODE_SOCKET_PATH=/home/cnode/sockets/node.socket_test \
-            src/cardano/wt/cardano_vending_machine.py \
-                    --payment-addr <PAYMENT_ADDR> \
-                    --payment-sign-key /FULL/PATH/TO/payment.skey \
-                    --profit-addr <PROFIT_ADDR> \
-                    --mint-price <PRICE_LOVELACE> \
-                    --mint-rebate <REBATE_LOVELACE>  \
-                    --mint-script /FULL/PATH/TO/policy.script \
-                    --mint-sign-key /FULL/PATH/TO/policy.skey \
-                    --mint-policy $(cat /FULL/PATH/TO/policyID) \
-                    --protocol-params /FULL/PATH/TO/protocol.json \
-                    --blockfrost-project <BLOCKFROST_PROJECT_ID> \
-                    --metadata-dir metadata/ \
-                    --output-dir output/
+        src/cardano/wt/cardano_vending_machine.py \
+                --payment-addr <PAYMENT_ADDR> \
+                --payment-sign-key /FULL/PATH/TO/payment.skey \
+                --profit-addr <PROFIT_ADDR> \
+                --mint-price <PRICE_LOVELACE> \
+                --mint-rebate <REBATE_LOVELACE>  \
+                --mint-script /FULL/PATH/TO/policy.script \
+                --mint-sign-key /FULL/PATH/TO/policy.skey \
+                --mint-policy $(cat /FULL/PATH/TO/policyID) \
+                --protocol-params /FULL/PATH/TO/protocol.json \
+                --blockfrost-project <BLOCKFROST_PROJECT_ID> \
+                --metadata-dir metadata/ \
+                --output-dir output/
 ## Installation
 This package is available from [PyPI](https://pypi.org/) and can be installed using ``pip3``.  Python <3.8 is currently unsupported at this time.
         
