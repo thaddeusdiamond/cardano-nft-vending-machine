@@ -63,6 +63,10 @@ class CardanoCli(object):
     def build_raw_mint_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint, nft_names): 
         named_asset_str = CardanoCli.named_asset_str(mint.policy, nft_names)
         mint_args = [f"--mint='{named_asset_str}'", f"--minting-script-file {mint.script}"] if nft_names else []
+        if mint.initial_slot:
+            mint_args.append(f"--invalid-before {mint.initial_slot}")
+        if mint.expiration_slot:
+            mint_args.append(f"--invalid-hereafter {mint.expiration_slot}")
         return self.build_raw_txn(output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint_args)
    
     def calculate_min_fee(self, raw_build_file, tx_in_count, tx_out_count, witness_count):
