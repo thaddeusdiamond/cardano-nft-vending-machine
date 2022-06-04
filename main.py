@@ -83,6 +83,7 @@ def get_parser():
     parser.add_argument('--payment-addr', required=True, help='Cardano address where mint payments are sent to')
     parser.add_argument('--payment-sign-key', required=True, help='Location on disk of wallet signing keys for payment landing zone')
     parser.add_argument('--profit-addr', required=True, help='Cardano address where mint profits should be taken (NOTE: HARDWARE/LEDGER RECOMMENDED)')
+    parser.add_argument('--single-vend-max', type=int, required=False, help='Backend limit enforced on NFTs vended at once (recommended)')
     parser.add_argument('--mint-price', type=int, required=True, help='Price in lovelace that is being charged for each NFT')
     parser.add_argument('--mint-rebate', type=int, required=True, help='Amount user expects to receive back (gross of fees)')
     parser.add_argument('--mint-policy', required=True, help='Policy ID of the mint being performed')
@@ -109,7 +110,16 @@ if __name__ == "__main__":
     _protocol_params = rewritten_protocol_params(_blockfrost_api.get_protocol_parameters(), _args.output_dir)
     _cardano_cli = CardanoCli(mainnet=_args.mainnet, protocol_params=_protocol_params)
 
-    _nft_vending_machine = NftVendingMachine(_args.payment_addr, _args.payment_sign_key, _args.profit_addr, _mint, _blockfrost_api, _cardano_cli, mainnet=_args.mainnet)
+    _nft_vending_machine = NftVendingMachine(
+            _args.payment_addr,
+            _args.payment_sign_key,
+            _args.profit_addr,
+            _args.single_vend_max,
+            _mint,
+            _blockfrost_api,
+            _cardano_cli,
+            mainnet=_args.mainnet
+    )
 
     exclusions = set()
     while _program_is_running:

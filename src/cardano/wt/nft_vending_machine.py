@@ -2,6 +2,7 @@ import json
 import math
 import os
 import shutil
+import sys
 import time
 
 from cardano.wt.cardano_cli import CardanoCli
@@ -16,10 +17,11 @@ class NftVendingMachine(object):
             return 'addr1qx2skanhkpgdhcyxnczydg3meqcv87z4vep7u2drrr6277v5entql0xseq6a4zs8j524wvwv6k46kpf8pt9ejjk6l9gs4g94mf'
         return 'addr_test1vrce7uwk8vcva5j4dmehrxprwy57x20yaz9cv9vqzjutnnsrgrfey'
 
-    def __init__(self, payment_addr, payment_sign_key, profit_addr, mint, blockfrost_api, cardano_cli, mainnet=False):
+    def __init__(self, payment_addr, payment_sign_key, profit_addr, single_vend_max, mint, blockfrost_api, cardano_cli, mainnet=False):
         self.payment_addr = payment_addr
         self.payment_sign_key = payment_sign_key
         self.profit_addr = profit_addr
+        self.single_vend_max = single_vend_max if single_vend_max else sys.maxsize
         self.mint = mint
         self.blockfrost_api = blockfrost_api
         self.cardano_cli = cardano_cli
@@ -67,7 +69,8 @@ class NftVendingMachine(object):
             raise ValueError(f"Found too many/few lovelace balances for UTXO {mint_req}")
 
         lovelace_bal = lovelace_bals.pop()
-        num_mints = min(len(available_mints), math.floor((lovelace_bal.lovelace - self.mint.rebate) / self.mint.price))
+        num_mints_requested = math.floor((lovelace_bal.lovelace - self.mint.rebate) / self.mint.price)
+        num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested)
         total_profit = num_mints * (self.mint.price - self.mint.donation) 
         total_donation = num_mints * self.mint.donation
         change = lovelace_bal.lovelace - (total_profit + total_donation)

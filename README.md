@@ -20,8 +20,8 @@ The library consists of several Python objects representing the mint process.  T
     # CardanoCli is a wrapper around the cardano-cli command (and uses the CARDANO_NODE_SOCKET_PATH env var)
     cardano_cli = CardanoCli(mainnet=True, protocol_params='/path/to/protocol.json')
 
-    # NftVendingMachine vends NFTs and needs to be called repeatedly so long as the mint period is open 
-    nft_vending_machine = NftVendingMachine('addr_payment', '/path/to/payment.skey', 'addr_profit', mint, blockfrost_api, cardano_cli, mainnet=True)
+    # NftVendingMachine vends NFTs and needs to be called repeatedly (with a 25-vend max) so long as the mint period is open
+    nft_vending_machine = NftVendingMachine('addr_payment', '/path/to/payment.skey', 'addr_profit', 25, mint, blockfrost_api, cardano_cli, mainnet=True)
 
     # The following simple loop carries the state of already-completed UTXOs to avoid double spending errors and uses a do-wait-check loop
     already_completed = set()
@@ -36,6 +36,7 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 --payment-addr <PAYMENT_ADDR> \
                 --payment-sign-key /FULL/PATH/TO/payment.skey \
                 --profit-addr <PROFIT_ADDR> \
+                [--single-vend-max <MAX_SINGLE_VEND>] \
                 --mint-price <PRICE_LOVELACE> \
                 --mint-rebate <REBATE_LOVELACE>  \
                 --mint-script /FULL/PATH/TO/policy.script \
