@@ -4,6 +4,7 @@ import os
 import shutil
 import sys
 import time
+import traceback
 
 from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.utxo import Utxo
@@ -99,4 +100,5 @@ class NftVendingMachine(object):
             try:
                 self.__do_vend(mint_req, output_dir, locked_subdir, metadata_subdir)
             except Exception as e:
-                print(f"WARNING: Uncaught exception {e} for {mint_req}, adding to exclusions (MANUALLY DEBUG THIS)")
+                print(f"WARNING: Uncaught exception for {mint_req}, adding to exclusions (MANUALLY DEBUG THIS)")
+                print(traceback.format_exc())
