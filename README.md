@@ -36,7 +36,6 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 --payment-addr <PAYMENT_ADDR> \
                 --payment-sign-key /FULL/PATH/TO/payment.skey \
                 --profit-addr <PROFIT_ADDR> \
-                [--single-vend-max <MAX_SINGLE_VEND>] \
                 --mint-price <PRICE_LOVELACE> \
                 --mint-rebate <REBATE_LOVELACE>  \
                 --mint-script /FULL/PATH/TO/policy.script \
@@ -44,7 +43,10 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 --mint-policy $(cat /FULL/PATH/TO/policyID) \
                 --blockfrost-project <BLOCKFROST_PROJECT_ID> \
                 --metadata-dir metadata/ \
-                --output-dir output/
+                --output-dir output/ \
+                [--single-vend-max <MAX_SINGLE_VEND>] \
+                [--vend-randomly] \
+                [--no-donation]
 ## Installation
 This package is available from [PyPI](https://pypi.org/) and can be installed using ``pip3``.  Python <3.8 is currently unsupported at this time.
         

@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import random
 import shutil
 import sys
 import time
@@ -18,10 +19,11 @@ class NftVendingMachine(object):
             return 'addr1qx2skanhkpgdhcyxnczydg3meqcv87z4vep7u2drrr6277v5entql0xseq6a4zs8j524wvwv6k46kpf8pt9ejjk6l9gs4g94mf'
         return 'addr_test1vrce7uwk8vcva5j4dmehrxprwy57x20yaz9cv9vqzjutnnsrgrfey'
 
-    def __init__(self, payment_addr, payment_sign_key, profit_addr, single_vend_max, mint, blockfrost_api, cardano_cli, mainnet=False):
+    def __init__(self, payment_addr, payment_sign_key, profit_addr, vend_randomly, single_vend_max, mint, blockfrost_api, cardano_cli, mainnet=False):
         self.payment_addr = payment_addr
         self.payment_sign_key = payment_sign_key
         self.profit_addr = profit_addr
+        self.vend_randomly = vend_randomly
         self.single_vend_max = single_vend_max if single_vend_max else sys.maxsize
         self.mint = mint
         self.blockfrost_api = blockfrost_api
@@ -63,6 +65,8 @@ class NftVendingMachine(object):
         available_mints = os.listdir(self.mint.nfts_dir)
         if not available_mints:
             print("WARNING: Metadata directory is empty, please restock the vending machine...")
+        elif self.vend_randomly:
+            random.shuffle(available_mints)
 
         input_addr = self.blockfrost_api.get_input_address(mint_req.hash)
         lovelace_bals = [balance for balance in mint_req.balances if balance.policy == Utxo.Balance.LOVELACE_POLICY]
