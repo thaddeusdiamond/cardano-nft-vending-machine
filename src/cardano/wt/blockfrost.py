@@ -9,6 +9,9 @@ from cardano.wt.utxo import Utxo
 Repreentation of the Blockfrost web API used in retrieving metadata about txn i/o on the chain.
 """
 class BlockfrostApi(object):
+
+    _UTXO_LIST_LIMIT = 100
+
     def __init__(self, project, mainnet=False):
         self.project = project
         self.mainnet = mainnet
@@ -39,21 +42,26 @@ class BlockfrostApi(object):
         return utxo_inputs.pop()
 
     def get_utxos(self, address, exclusions):
-        try:
-            utxo_data = self.__call_get_api(f"addresses/{address}/utxos")
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == HTTPStatus.NOT_FOUND:
-                return []
-            raise e
         available_utxos = set()
-        #print('EXCLUSIONS\t', [f'{utxo.hash}#{utxo.ix}' for utxo in exclusions])
-        for raw_utxo in utxo_data:
-            balances = [Utxo.Balance(int(balance['quantity']), balance['unit']) for balance in raw_utxo['amount']]
-            utxo = Utxo(raw_utxo['tx_hash'], raw_utxo['output_index'], balances)
-            if utxo in exclusions:
-                print(f'Skipping {utxo.hash}#{utxo.ix}')
-                continue
-            available_utxos.add(utxo)
+        current_page = 0
+        while True:
+            current_page += 1
+            try:
+                utxo_data = self.__call_get_api(f"addresses/{address}/utxos?count={BlockfrostApi._UTXO_LIST_LIMIT}&page={current_page}")
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == HTTPStatus.NOT_FOUND:
+                    return []
+                raise e
+            #print('EXCLUSIONS\t', [f'{utxo.hash}#{utxo.ix}' for utxo in exclusions])
+            for raw_utxo in utxo_data:
+                balances = [Utxo.Balance(int(balance['quantity']), balance['unit']) for balance in raw_utxo['amount']]
+                utxo = Utxo(raw_utxo['tx_hash'], raw_utxo['output_index'], balances)
+                if utxo in exclusions:
+                    print(f'Skipping {utxo.hash}#{utxo.ix}')
+                    continue
+                available_utxos.add(utxo)
+            if len(utxo_data) < BlockfrostApi._UTXO_LIST_LIMIT:
+                break
         return available_utxos
 
     def get_protocol_parameters(self):
