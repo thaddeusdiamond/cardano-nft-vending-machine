@@ -1,5 +1,6 @@
 import json
 import requests
+import time
 
 from http import HTTPStatus
 
@@ -10,16 +11,44 @@ Repreentation of the Blockfrost web API used in retrieving metadata about txn i/
 """
 class BlockfrostApi(object):
 
+    _API_CALLS_PER_SEC = 10
+    _BURST_TXN_PER_SEC = 10
+    _MAX_BURST = 500
     _UTXO_LIST_LIMIT = 100
 
     def __init__(self, project, mainnet=False):
         self.project = project
         self.mainnet = mainnet
+        self.built_up_burst = BlockfrostApi._MAX_BURST
+        self.bursting = False
+        self.curr_sec = int(time.time())
+        self.curr_calls = 0
+
+    def __account_for_rate_limit(self):
+        this_time = time.time()
+        this_sec = int(this_time)
+        if self.curr_sec == this_sec:
+            self.curr_calls += 1
+        else:
+            if self.bursting:
+                self.built_up_burst = 0
+            else:
+                self.built_up_burst = max(BlockfrostApi._MAX_BURST, self.built_up_burst + BlockfrostApi._BURST_TXN_PER_SEC)
+            self.bursting = False
+            self.curr_sec = this_sec
+            self.curr_calls = 1
+        if self.curr_calls == BlockfrostApi._API_CALLS_PER_SEC:
+            print("Blockfrost API: ENTERING BURST, EXCEEDED ALLOWABLE API CALLS")
+            self.bursting = True
+        if self.bursting and (self.curr_calls > BlockfrostApi._MAX_BURST):
+            print("Blockfrost API: BEYOND BURST CAPABILITIES, MAY RESULT IN FATAL ERROR")
+            time.sleep(1.0  / BlockfrostApi._API_CALLS_PER_SEC)
 
     def __get_api_base(self):
         return f"https://cardano-{'mainnet' if self.mainnet else 'testnet'}.blockfrost.io/api/v0"
 
     def __call_get_api(self, resource):
+        self.__account_for_rate_limit()
         api_resp = requests.get(f"{self.__get_api_base()}/{resource}", headers={'project_id': self.project})
         print(f"Blockfrost API: {resource} ({api_resp.status_code})")
         api_resp.raise_for_status()
@@ -27,6 +56,7 @@ class BlockfrostApi(object):
         return api_resp.json()
 
     def __call_post_api(self, content_type, resource, data):
+        self.__account_for_rate_limit()
         api_resp = requests.post(f"{self.__get_api_base()}/{resource}", headers={'project_id': self.project, 'Content-Type': content_type}, data=data)
         print(f"Blockfrost API: {resource} ({api_resp.status_code})")
         print(api_resp.text)
