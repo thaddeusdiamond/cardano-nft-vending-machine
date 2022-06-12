@@ -5,6 +5,8 @@ Simple UTXO object to strengthen the type of CLI-returned strings
 """
 class Utxo(object):
 
+    MIN_UTXO_VALUE = 1000000
+
     class Balance(object):
         LOVELACE_POLICY = 'lovelace'
 

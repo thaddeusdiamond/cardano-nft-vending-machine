@@ -8,10 +8,12 @@ import time
 import traceback
 
 from cardano.wt.cardano_cli import CardanoCli
+from cardano.wt.mint import Mint
 from cardano.wt.utxo import Utxo
 
 class NftVendingMachine(object):
 
+    __SINGLE_POLICY = 1
     __WITNESS_COUNT = 2
 
     def __get_donation_addr(mainnet):
@@ -42,6 +44,11 @@ class NftVendingMachine(object):
             policy_json = json.load(metadata_filehandle)['721'][self.mint.policy]
             names = policy_json.keys()
             return [name.encode('UTF-8').hex() for name in names]
+
+    def __get_nft_names_from(self, metadata_file):
+        with open(metadata_file, 'r') as metadata_filehandle:
+            policy_json = json.load(metadata_filehandle)['721'][self.mint.policy]
+            return policy_json.keys()
 
     def __lock_and_merge(self, available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id):
         combined_nft_metadata = {}
@@ -77,21 +84,28 @@ class NftVendingMachine(object):
         num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price)
         num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested)
         gross_profit = num_mints * self.mint.price
-        net_profit = gross_profit - self.mint.donation - self.mint.rebate 
-        print(f"Beginning to mint {num_mints} NFTs to send to address {input_addr} (rebate: {self.mint.rebate})")
 
+        print(f"Beginning to mint {num_mints} NFTs to send to address {input_addr}")
         txn_id = int(time.time())
         nft_metadata_file = self.__lock_and_merge(available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id)
         nft_names = self.__generate_nft_names_from(nft_metadata_file)
+
+        total_name_chars = sum([len(name) for name in self.__get_nft_names_from(nft_metadata_file)])
+        user_rebate = Mint.RebateCalculator.calculateRebateFor(NftVendingMachine.__SINGLE_POLICY, num_mints, total_name_chars)
+        net_profit = gross_profit - self.mint.donation - user_rebate 
+        if (net_profit < Utxo.MIN_UTXO_VALUE):
+            raise ValueError(f"Rebate of {user_rebate} would leave too small profit of {net_profit}")
+        print(f"Minimum rebate to user is {user_rebate}, net profit to vault is {net_profit}")
+
         tx_ins = [f"--tx-in {mint_req.hash}#{mint_req.ix}"]
-        tx_outs = self.__get_tx_out_args(input_addr, self.mint.rebate, nft_names, net_profit, self.mint.donation)
+        tx_outs = self.__get_tx_out_args(input_addr, user_rebate, nft_names, net_profit, self.mint.donation)
         mint_build_tmp = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, 0, nft_metadata_file, self.mint, nft_names)
 
         tx_in_count = len(tx_ins)
         tx_out_count = len([tx_out for tx_out in tx_outs if tx_out])
         fee = self.cardano_cli.calculate_min_fee(mint_build_tmp, tx_in_count, tx_out_count, NftVendingMachine.__WITNESS_COUNT)
 
-        tx_outs = self.__get_tx_out_args(input_addr, self.mint.rebate, nft_names, net_profit - fee, self.mint.donation)
+        tx_outs = self.__get_tx_out_args(input_addr, user_rebate, nft_names, net_profit - fee, self.mint.donation)
         mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
         mint_signed = self.cardano_cli.sign_txn([self.payment_sign_key, self.mint.sign_key], mint_build)
         self.blockfrost_api.submit_txn(mint_signed)

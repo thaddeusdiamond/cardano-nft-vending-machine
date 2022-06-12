@@ -88,7 +88,6 @@ def get_parser():
     parser.add_argument('--payment-sign-key', required=True, help='Location on disk of wallet signing keys for payment landing zone')
     parser.add_argument('--profit-addr', required=True, help='Cardano address where mint profits should be taken (NOTE: HARDWARE/LEDGER RECOMMENDED)')
     parser.add_argument('--mint-price', type=int, required=True, help='Price in lovelace that is being charged for each NFT')
-    parser.add_argument('--mint-rebate', type=int, required=True, help='Amount user expects to receive back (gross of fees)')
     parser.add_argument('--mint-policy', required=True, help='Policy ID of the mint being performed')
     parser.add_argument('--mint-script', required=True, help='Local path of scripting file for mint')
     parser.add_argument('--mint-sign-key', required=True, help='Location on disk of signing keys used for the mint')
@@ -109,11 +108,14 @@ if __name__ == "__main__":
     ensure_output_dirs_made(_args.output_dir)
 
     _donation_amt = get_donation_amt(_args.no_donation)
-    _mint = Mint(_args.mint_policy, _args.mint_price, _args.mint_rebate, _donation_amt, _args.metadata_dir, _args.mint_script, _args.mint_sign_key)
+    _mint = Mint(_args.mint_policy, _args.mint_price, _donation_amt, _args.metadata_dir, _args.mint_script, _args.mint_sign_key)
 
     _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet)
 
-    _protocol_params = rewritten_protocol_params(_blockfrost_api.get_protocol_parameters(), _args.output_dir)
+    _blockfrost_protocol_params = _blockfrost_api.get_protocol_parameters()
+    _protocol_params = rewritten_protocol_params(_blockfrost_protocol_params, _args.output_dir)
+    max_txn_fee = (_blockfrost_protocol_params['min_fee_a'] * _blockfrost_protocol_params['max_tx_size']) + _blockfrost_protocol_params['min_fee_b']
+    print(f"Max txn fee is a * size(tx) + b: {max_txn_fee}");
     _cardano_cli = CardanoCli(mainnet=_args.mainnet, protocol_params=_protocol_params)
 
     _nft_vending_machine = NftVendingMachine(
