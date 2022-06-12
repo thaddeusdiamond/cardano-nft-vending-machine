@@ -74,25 +74,24 @@ class NftVendingMachine(object):
             raise ValueError(f"Found too many/few lovelace balances for UTXO {mint_req}")
 
         lovelace_bal = lovelace_bals.pop()
-        num_mints_requested = math.floor((lovelace_bal.lovelace - self.mint.rebate) / self.mint.price)
+        num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price)
         num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested)
-        total_profit = num_mints * (self.mint.price - self.mint.donation) 
-        total_donation = num_mints * self.mint.donation
-        change = lovelace_bal.lovelace - (total_profit + total_donation)
-        print(f"Beginning to mint {num_mints} NFTs to send to address {input_addr} (change: {change})")
+        gross_profit = num_mints * self.mint.price
+        net_profit = gross_profit - self.mint.donation - self.mint.rebate 
+        print(f"Beginning to mint {num_mints} NFTs to send to address {input_addr} (rebate: {self.mint.rebate})")
 
         txn_id = int(time.time())
         nft_metadata_file = self.__lock_and_merge(available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id)
         nft_names = self.__generate_nft_names_from(nft_metadata_file)
         tx_ins = [f"--tx-in {mint_req.hash}#{mint_req.ix}"]
-        tx_outs = self.__get_tx_out_args(input_addr, change, nft_names, total_profit, total_donation)
+        tx_outs = self.__get_tx_out_args(input_addr, self.mint.rebate, nft_names, net_profit, self.mint.donation)
         mint_build_tmp = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, 0, nft_metadata_file, self.mint, nft_names)
 
         tx_in_count = len(tx_ins)
         tx_out_count = len([tx_out for tx_out in tx_outs if tx_out])
         fee = self.cardano_cli.calculate_min_fee(mint_build_tmp, tx_in_count, tx_out_count, NftVendingMachine.__WITNESS_COUNT)
 
-        tx_outs = self.__get_tx_out_args(input_addr, change - fee, nft_names, total_profit, total_donation)
+        tx_outs = self.__get_tx_out_args(input_addr, self.mint.rebate, nft_names, net_profit - fee, self.mint.donation)
         mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
         mint_signed = self.cardano_cli.sign_txn([self.payment_sign_key, self.mint.sign_key], mint_build)
         self.blockfrost_api.submit_txn(mint_signed)

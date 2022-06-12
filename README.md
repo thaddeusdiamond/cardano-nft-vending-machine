@@ -9,10 +9,10 @@ Interactions on the Cardano blockchain involve **REAL CURRENCY AND SHOULD NOT BE
 ## Quickstart
 This project contains Library bindings that can be installed using the standard [wheel](https://pypi.org/project/wheel/) mechanism.  See the [script quickstart section](#cardano_vending_machinepy) for how to run from CLI.
 ### Library Usage
-The library consists of several Python objects representing the mint process.  The sample below shows how one could run an infinite CNFT vending machine on mainnet for a 10₳ mint where users send an extra 2₳ for the rebate:
+The library consists of several Python objects representing the mint process.  The sample below shows how one could run an infinite CNFT vending machine on mainnet for a 10₳ mint where users receive back 1.5₳ with their NFT:
 
     # The Mint object below represents your Mint policy and specifies price, rebate, and donation in Lovelace
-    mint = Mint('<POLICY_ID>', 10000000, 2000000, 1000000, '/path/to/nft/json/metadata', '/path/to/mint/script', '/path/to/mint.skey')
+    mint = Mint('<POLICY_ID>', 10000000, 1500000, 1000000, '/path/to/nft/json/metadata', '/path/to/mint/script', '/path/to/mint.skey')
 
     # Blockfrost is used in the code to validate where the UTXO sent to the payment address came from
     blockfrost_api = BlockfrostApi('<BLOCKFROST_PROJ_ID>', mainnet=True)
