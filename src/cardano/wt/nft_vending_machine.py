@@ -84,6 +84,7 @@ class NftVendingMachine(object):
         num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price)
         num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested)
         gross_profit = num_mints * self.mint.price
+        change = lovelace_bal.lovelace - gross_profit
 
         print(f"Beginning to mint {num_mints} NFTs to send to address {input_addr}")
         txn_id = int(time.time())
@@ -98,14 +99,14 @@ class NftVendingMachine(object):
         print(f"Minimum rebate to user is {user_rebate}, net profit to vault is {net_profit}")
 
         tx_ins = [f"--tx-in {mint_req.hash}#{mint_req.ix}"]
-        tx_outs = self.__get_tx_out_args(input_addr, user_rebate, nft_names, net_profit, self.mint.donation)
+        tx_outs = self.__get_tx_out_args(input_addr, user_rebate + change, nft_names, net_profit, self.mint.donation)
         mint_build_tmp = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, 0, nft_metadata_file, self.mint, nft_names)
 
         tx_in_count = len(tx_ins)
         tx_out_count = len([tx_out for tx_out in tx_outs if tx_out])
         fee = self.cardano_cli.calculate_min_fee(mint_build_tmp, tx_in_count, tx_out_count, NftVendingMachine.__WITNESS_COUNT)
 
-        tx_outs = self.__get_tx_out_args(input_addr, user_rebate, nft_names, net_profit - fee, self.mint.donation)
+        tx_outs = self.__get_tx_out_args(input_addr, user_rebate + change, nft_names, net_profit - fee, self.mint.donation)
         mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
         mint_signed = self.cardano_cli.sign_txn([self.payment_sign_key, self.mint.sign_key], mint_build)
         self.blockfrost_api.submit_txn(mint_signed)
