@@ -14,7 +14,7 @@ from cardano.wt.utxo import Utxo
 class NftVendingMachine(object):
 
     __SINGLE_POLICY = 1
-    __WITNESS_COUNT = 2
+    __WITNESS_COUNT = 3
 
     def __get_donation_addr(mainnet):
         if mainnet:
@@ -35,7 +35,7 @@ class NftVendingMachine(object):
     def __get_tx_out_args(self, input_addr, change, nft_names, total_profit, total_donation):
         user_tokens = filter(None, [input_addr, str(change), CardanoCli.named_asset_str(self.mint.policy, nft_names)])
         user_output = f"--tx-out '{'+'.join(user_tokens)}'"
-        profit_output = f"--tx-out '{self.profit_addr}+{total_profit}'" if total_profit else '' 
+        profit_output = f"--tx-out '{self.profit_addr}+{total_profit}'" if total_profit else ''
         donation_output = f"--tx-out '{self.donation_addr}+{total_donation}'" if total_donation else ''
         return [user_output, profit_output, donation_output]
 
@@ -93,8 +93,8 @@ class NftVendingMachine(object):
 
         total_name_chars = sum([len(name) for name in self.__get_nft_names_from(nft_metadata_file)])
         user_rebate = Mint.RebateCalculator.calculateRebateFor(NftVendingMachine.__SINGLE_POLICY, num_mints, total_name_chars)
-        net_profit = gross_profit - self.mint.donation - user_rebate 
-        if (net_profit < Utxo.MIN_UTXO_VALUE):
+        net_profit = gross_profit - self.mint.donation - user_rebate
+        if net_profit != 0 and net_profit < Utxo.MIN_UTXO_VALUE:
             raise ValueError(f"Rebate of {user_rebate} would leave too small profit of {net_profit}")
         print(f"Minimum rebate to user is {user_rebate}, net profit to vault is {net_profit}")
 
@@ -106,7 +106,11 @@ class NftVendingMachine(object):
         tx_out_count = len([tx_out for tx_out in tx_outs if tx_out])
         fee = self.cardano_cli.calculate_min_fee(mint_build_tmp, tx_in_count, tx_out_count, NftVendingMachine.__WITNESS_COUNT)
 
-        tx_outs = self.__get_tx_out_args(input_addr, user_rebate + change, nft_names, net_profit - fee, self.mint.donation)
+        if net_profit:
+            net_profit = net_profit - fee
+        else:
+            change = change - fee
+        tx_outs = self.__get_tx_out_args(input_addr, user_rebate + change, nft_names, net_profit, self.mint.donation)
         mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
         mint_signed = self.cardano_cli.sign_txn([self.payment_sign_key, self.mint.sign_key], mint_build)
         self.blockfrost_api.submit_txn(mint_signed)

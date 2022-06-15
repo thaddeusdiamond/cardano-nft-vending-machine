@@ -17,6 +17,8 @@ class Mint(object):
         __UTXO_BASE_RATIO = math.ceil(Utxo.MIN_UTXO_VALUE / __ADA_ONLY_UTXO_SIZE)
 
         def calculateRebateFor(num_policies, num_assets, total_name_chars):
+            if num_assets < 1:
+                return 0
             asset_words = math.ceil(((num_assets * 12.0) + (total_name_chars) + (num_policies * Mint.RebateCalculator.__PIDSIZE)) / 8.0)
             utxo_native_token_multiplier = Mint.RebateCalculator.__UTXO_SIZE_WITHOUT_VAL + (6 + asset_words)
             return int(Mint.RebateCalculator.__UTXO_BASE_RATIO * utxo_native_token_multiplier)
