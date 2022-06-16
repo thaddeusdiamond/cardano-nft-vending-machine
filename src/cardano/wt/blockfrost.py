@@ -54,7 +54,7 @@ class BlockfrostApi(object):
         retries = 0
         while True:
             try:
-                pi_resp = requests.get(f"{self.__get_api_base()}/{resource}", headers={'project_id': self.project})
+                api_resp = requests.get(f"{self.__get_api_base()}/{resource}", headers={'project_id': self.project})
                 print(f"Blockfrost API: {resource} ({api_resp.status_code})")
                 api_resp.raise_for_status()
                 print(api_resp.json())
