@@ -81,7 +81,7 @@ class NftVendingMachine(object):
             raise ValueError(f"Found too many/few lovelace balances for UTXO {mint_req}")
 
         lovelace_bal = lovelace_bals.pop()
-        num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price)
+        num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price) if self.mint.price else 1
         num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested)
         gross_profit = num_mints * self.mint.price
         change = lovelace_bal.lovelace - gross_profit
@@ -92,9 +92,9 @@ class NftVendingMachine(object):
         nft_names = self.__generate_nft_names_from(nft_metadata_file)
 
         total_name_chars = sum([len(name) for name in self.__get_nft_names_from(nft_metadata_file)])
-        user_rebate = Mint.RebateCalculator.calculateRebateFor(NftVendingMachine.__SINGLE_POLICY, num_mints, total_name_chars)
+        user_rebate = Mint.RebateCalculator.calculateRebateFor(NftVendingMachine.__SINGLE_POLICY, num_mints, total_name_chars) if self.mint.price else 0
         net_profit = gross_profit - self.mint.donation - user_rebate
-        if net_profit != 0 and net_profit < Utxo.MIN_UTXO_VALUE:
+        if net_profit and net_profit < Utxo.MIN_UTXO_VALUE:
             raise ValueError(f"Rebate of {user_rebate} would leave too small profit of {net_profit}")
         print(f"Minimum rebate to user is {user_rebate}, net profit to vault is {net_profit}")
 

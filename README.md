@@ -11,7 +11,7 @@ This project contains Library bindings that can be installed using the standard 
 ### Library Usage
 The library consists of several Python objects representing the mint process.  The sample below shows how one could run an infinite CNFT vending machine on mainnet for a 10₳ mint (gross of fees and rebates) with their NFT:
 
-    # The Mint object below represents your Mint policy and specifies price, and donation in Lovelace
+    # The Mint object below represents your Mint policy and specifies price, and donation in Lovelace (both can be 0)
     mint = Mint('<POLICY_ID>', 10000000, 1000000, '/path/to/nft/json/metadata', '/path/to/mint/script', '/path/to/mint.skey')
 
     # Blockfrost is used in the code to validate where the UTXO sent to the payment address came from
@@ -36,7 +36,7 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 --payment-addr <PAYMENT_ADDR> \
                 --payment-sign-key /FULL/PATH/TO/payment.skey \
                 --profit-addr <PROFIT_ADDR> \
-                --mint-price <PRICE_LOVELACE> \
+                [--mint-price <PRICE_LOVELACE> | --free-mint] \
                 --mint-script /FULL/PATH/TO/policy.script \
                 --mint-sign-key /FULL/PATH/TO/policy.skey \
                 --mint-policy $(cat /FULL/PATH/TO/policyID) \
