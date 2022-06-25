@@ -40,7 +40,7 @@ BLOCKFROST_PROTOCOL_TRANSLATOR = {
 # Vending machine internal constants (global required)
 LOCKED_SUBDIR = 'in_proc'
 METADATA_SUBDIR = 'metadata'
-WAIT_TIMEOUT = 5
+WAIT_TIMEOUT = 15
 
 _program_is_running = True
 
