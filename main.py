@@ -80,8 +80,8 @@ def rewritten_protocol_params(blockfrost_protocol_json, output_dir):
         json.dump(cardanocli_protocol_json, protocol_file)
     return protocol_filename
 
-def get_donation_amt(do_not_donate, free_mint):
-    return 0 if (do_not_donate or free_mint) else 1000000
+def get_donation_amt(donate, free_mint):
+    return 0 if ((not donate) or free_mint) else 1000000
 
 def get_mint_price(mint_price, free_mint):
     assert(not (free_mint and mint_price))
@@ -108,7 +108,7 @@ def get_parser():
     parser.add_argument('--mainnet', action='store_true', help='Run the vending machine in production (default is testnet)')
     parser.add_argument('--single-vend-max', type=int, required=False, help='Backend limit enforced on NFTs vended at once (recommended)')
     parser.add_argument('--vend-randomly', action='store_true', help='Randomly pick from the metadata directory (using seed 321) when listing')
-    parser.add_argument('--no-donation', action='store_true', help='Do not send a 1₳ donation to the dev (no worries!)')
+    parser.add_argument('--donation', action='store_true', help='Send a 1₳ donation per txn to the dev (no worries!)')
     return parser
 
 if __name__ == "__main__":
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     ensure_output_dirs_made(_args.output_dir)
 
     _mint_price = get_mint_price(_args.mint_price, _args.free_mint)
-    _donation_amt = get_donation_amt(_args.no_donation, _args.free_mint)
+    _donation_amt = get_donation_amt(_args.donation, _args.free_mint)
     _mint = Mint(_args.mint_policy, _mint_price, _donation_amt, _args.metadata_dir, _args.mint_script, _args.mint_sign_key)
 
     _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet)

@@ -45,7 +45,7 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 --output-dir output/ \
                 [--single-vend-max <MAX_SINGLE_VEND>] \
                 [--vend-randomly] \
-                [--no-donation]
+                [--donation]
 ## Installation
 This package is available from [PyPI](https://pypi.org/) and can be installed using ``pip3``.  Python <3.8 is currently unsupported at this time.
         
