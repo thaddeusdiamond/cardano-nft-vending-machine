@@ -1,5 +1,6 @@
 import json
 import math
+import os
 
 from cardano.wt.utxo import Utxo
 
@@ -7,6 +8,9 @@ from cardano.wt.utxo import Utxo
 Representation of the current minting process.
 """
 class Mint(object):
+
+    _METADATA_KEY = '721'
+    _POLICY_LEN = 56
 
     class RebateCalculator(object):
         __COIN_SIZE = 0.0               # Will change in next era to slightly lower fees
@@ -22,7 +26,7 @@ class Mint(object):
             asset_words = math.ceil(((num_assets * 12.0) + (total_name_chars) + (num_policies * Mint.RebateCalculator.__PIDSIZE)) / 8.0)
             utxo_native_token_multiplier = Mint.RebateCalculator.__UTXO_SIZE_WITHOUT_VAL + (6 + asset_words)
             return int(Mint.RebateCalculator.__UTXO_BASE_RATIO * utxo_native_token_multiplier)
-        
+
         def __init__(self):
             raise ValueError('Mint rebate calculator is meant to be used as a static class only')
 
@@ -45,3 +49,30 @@ class Mint(object):
 
         self.initial_slot = Mint.__read_validator('after', 'slot', script)
         self.expiration_slot = Mint.__read_validator('before', 'slot', script)
+
+    def validate(self):
+        existing = []
+        for filename in os.listdir(self.nfts_dir):
+            with open(filename, 'r') as file:
+                print(f"Validating {filename}")
+                validated_nft = self.__validated_nft(json.load(file), existing)
+                existing.append(validated_nft)
+
+    def __validated_nft(self, nft, existing):
+        if len(nft.keys()) != 1:
+            raise ValueError(f"Incorrect # of keys ({len(nft.keys())}) found in file '{filename}'")
+        if not Mint._METADATA_KEY in nft:
+            raise ValueError(f"Missing top-level metadata key ({Mint._METADATA_KEY}) in file '{filename}'")
+        nft_policy_obj = nft[Mint._METADATA_KEY]
+        if len(nft_policy_obj.keys()) != 1:
+            raise ValueError(f"Incorrect # of policy keys ({len(nft_policy_arr.keys())}) found in file '{filename}'")
+        policy = list(nft_policy_obj.keys())[0]
+        if len(policy) != Mint._POLICY_LEN:
+            raise ValueError(f"Incorrect looking policy {policy} in file '{filename}'")
+        asset_obj = nft_policy_arr[policy]
+        if len(asset_obj.keys()) != 1:
+            raise ValueError(f"Incorrect # of assets ({len(nft_policy_arr.keys())}) found in file '{filename}'")
+        asset_name = list(asset_obj.keys())[0]
+        if asset_name in existing:
+            raise ValueError(f"Found duplicate asset name '{asset_name}' in file '{filename}'")
+        return asset_name

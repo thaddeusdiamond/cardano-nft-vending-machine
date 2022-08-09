@@ -122,6 +122,7 @@ if __name__ == "__main__":
     _mint_price = get_mint_price(_args.mint_price, _args.free_mint)
     _donation_amt = get_donation_amt(_args.donation, _args.free_mint)
     _mint = Mint(_args.mint_policy, _mint_price, _donation_amt, _args.metadata_dir, _args.mint_script, _args.mint_sign_key)
+    _mint.validate()
 
     _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet)
 
