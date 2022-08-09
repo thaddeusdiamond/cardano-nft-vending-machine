@@ -16,6 +16,9 @@ class NftVendingMachine(object):
     __SINGLE_POLICY = 1
     __WITNESS_COUNT = 3
 
+    def as_json(self):
+        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+
     def __get_donation_addr(mainnet):
         if mainnet:
             return 'addr1qx2skanhkpgdhcyxnczydg3meqcv87z4vep7u2drrr6277v5entql0xseq6a4zs8j524wvwv6k46kpf8pt9ejjk6l9gs4g94mf'

@@ -12,9 +12,11 @@ Repreentation of the Blockfrost web API used in retrieving metadata about txn i/
 class BlockfrostApi(object):
 
     _API_CALLS_PER_SEC = 10
-    _BACKOFF_SEC = 5
+    _APPLICATION_JSON = 'application/json'
+    _BACKOFF_SEC = 10
     _BURST_TXN_PER_SEC = 10
-    _MAX_RETRIES = 9
+    _MAX_GET_RETRIES = 9
+    _MAX_POST_RETRIES = 3
     _MAX_BURST = 500
     _UTXO_LIST_LIMIT = 100
 
@@ -49,33 +51,37 @@ class BlockfrostApi(object):
     def __get_api_base(self):
         return f"https://cardano-{'mainnet' if self.mainnet else 'testnet'}.blockfrost.io/api/v0"
 
-    def __call_get_api(self, resource, max_retries=0):
+    def __call_with_retries(self, call_func, max_retries):
         self.__account_for_rate_limit()
         retries = 0
         while True:
             try:
-                api_resp = requests.get(f"{self.__get_api_base()}/{resource}", headers={'project_id': self.project})
-                print(f"Blockfrost API: {resource} ({api_resp.status_code})")
+                api_resp = call_func()
+                print(f"{api_resp.url}: ({api_resp.status_code})")
+                print(api_resp.text)
                 api_resp.raise_for_status()
-                print(api_resp.json())
                 return api_resp.json()
             except requests.exceptions.HTTPError as e:
                 if retries < max_retries:
                     retries += 1
-                    time.sleep(BlockfrostApi._BACKOFF_SEC)
+                    time.sleep(retries * BlockfrostApi._BACKOFF_SEC)
                 else:
                     raise e
 
+    def __call_get_api(self, resource):
+        return self.__call_with_retries(
+            lambda: requests.get(f"{self.__get_api_base()}/{resource}", headers={'project_id': self.project, 'Content-Type': BlockfrostApi._APPLICATION_JSON}),
+            BlockfrostApi._MAX_GET_RETRIES
+        )
+
     def __call_post_api(self, content_type, resource, data):
-        self.__account_for_rate_limit()
-        api_resp = requests.post(f"{self.__get_api_base()}/{resource}", headers={'project_id': self.project, 'Content-Type': content_type}, data=data)
-        print(f"Blockfrost API: {resource} ({api_resp.status_code})")
-        print(api_resp.text)
-        api_resp.raise_for_status()
-        return api_resp.json()
+        return self.__call_with_retries(
+            lambda: requests.post(f"{self.__get_api_base()}/{resource}", headers={'project_id': self.project, 'Content-Type': content_type}, data=data),
+            BlockfrostApi._MAX_POST_RETRIES
+        )
 
     def get_input_address(self, txn_hash):
-        utxo_metadata = self.__call_get_api(f"txs/{txn_hash}/utxos", max_retries=BlockfrostApi._MAX_RETRIES)
+        utxo_metadata = self.__call_get_api(f"txs/{txn_hash}/utxos")
         utxo_inputs = set([utxo_input['address'] for utxo_input in utxo_metadata['inputs']])
         if len(utxo_inputs) < 1:
             raise ValueError(f"Txn hash {txn_hash} has no valid addresses({utxo_inputs}), aborting...")

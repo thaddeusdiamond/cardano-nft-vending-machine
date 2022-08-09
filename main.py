@@ -75,6 +75,7 @@ def generate_cardano_cli_protocol(translator, blockfrost_input):
 
 def rewritten_protocol_params(blockfrost_protocol_json, output_dir):
     cardanocli_protocol_json = generate_cardano_cli_protocol(BLOCKFROST_PROTOCOL_TRANSLATOR, blockfrost_protocol_json)
+    print(cardanocli_protocol_json)
     protocol_filename = os.path.join(output_dir, 'protocol.json')
     with open(protocol_filename, 'w') as protocol_file:
         json.dump(cardanocli_protocol_json, protocol_file)
@@ -141,6 +142,8 @@ if __name__ == "__main__":
             _cardano_cli,
             mainnet=_args.mainnet
     )
+    print(f"Initialized vending machine with the following parameters")
+    print(_nft_vending_machine.as_json())
 
     exclusions = set()
     while _program_is_running:
