@@ -131,3 +131,6 @@ dmypy.json
 # Vim temporary files
 *.swo
 *.swp
+
+# Mac temporary files
+**/.DS_Store
