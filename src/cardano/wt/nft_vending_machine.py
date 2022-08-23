@@ -15,6 +15,7 @@ class NftVendingMachine(object):
 
     __SINGLE_POLICY = 1
     __WITNESS_COUNT = 3
+    __ERROR_WAIT = 30
 
     def as_json(self):
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
@@ -128,9 +129,10 @@ class NftVendingMachine(object):
     def vend(self, output_dir, locked_subdir, metadata_subdir, exclusions):
         mint_reqs = self.blockfrost_api.get_utxos(self.payment_addr, exclusions)
         for mint_req in mint_reqs:
-            exclusions.add(mint_req)
             try:
                 self.__do_vend(mint_req, output_dir, locked_subdir, metadata_subdir)
+                exclusions.add(mint_req)
             except Exception as e:
-                print(f"WARNING: Uncaught exception for {mint_req}, adding to exclusions (MANUALLY DEBUG THIS)")
+                print(f"WARNING: Uncaught exception for {mint_req}, not adding to exclusions (MANUALLY DEBUG THIS)")
                 print(traceback.format_exc())
+                time.sleep(NftVendingMachine.__ERROR_WAIT)
