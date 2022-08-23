@@ -78,14 +78,20 @@ class NftVendingMachine(object):
         elif self.vend_randomly:
             random.shuffle(available_mints)
 
-        input_addr = self.blockfrost_api.get_input_address(mint_req.hash)
+        utxo_inputs = self.blockfrost_api.get_inputs(mint_req.hash)
+        input_addrs = set([utxo_input['address'] for utxo_input in utxo_inputs])
+        if len(input_addrs) < 1:
+            raise ValueError(f"Txn hash {txn_hash} has no valid addresses ({utxo_inputs}), aborting...")
+        input_addr = input_addrs.pop()
+
         lovelace_bals = [balance for balance in mint_req.balances if balance.policy == Utxo.Balance.LOVELACE_POLICY]
         if len(lovelace_bals) != 1:
             raise ValueError(f"Found too many/few lovelace balances for UTXO {mint_req}")
 
         lovelace_bal = lovelace_bals.pop()
         num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price) if self.mint.price else 1
-        num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested)
+        wl_availability = self.mint.whitelist.available(utxo_inputs)
+        num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested, wl_availability)
         gross_profit = num_mints * self.mint.price
         change = lovelace_bal.lovelace - gross_profit
 
@@ -117,6 +123,7 @@ class NftVendingMachine(object):
         mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
         mint_signed = self.cardano_cli.sign_txn([self.payment_sign_key, self.mint.sign_key], mint_build)
         self.blockfrost_api.submit_txn(mint_signed)
+        self.mint.whitelist.consume(utxo_inputs, num_mints)
 
     def vend(self, output_dir, locked_subdir, metadata_subdir, exclusions):
         mint_reqs = self.blockfrost_api.get_utxos(self.payment_addr, exclusions)

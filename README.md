@@ -1,4 +1,4 @@
-# cardano-nft-vending-machine 
+# cardano-nft-vending-machine
 ### A simple CNFT mint-and-vend machine Python library that leverages ``cardano-cli``
 ## :warning: **IMPORTANT**
 Interactions on the Cardano blockchain involve **REAL CURRENCY AND SHOULD NOT BE TREATED LIGHTLY**.  Some principles:
@@ -11,8 +11,11 @@ This project contains Library bindings that can be installed using the standard 
 ### Library Usage
 The library consists of several Python objects representing the mint process.  The sample below shows how one could run an infinite CNFT vending machine on mainnet for a 10₳ mint (gross of fees and rebates) with their NFT:
 
+    # There are several sample whitelist implementations in cardano.wt.whitelist or you can implement your own
+    whitelist = SingleUseWhitelist('/path/to/whitelisted/assets/directory')
+
     # The Mint object below represents your Mint policy and specifies price, and donation in Lovelace (both can be 0)
-    mint = Mint('<POLICY_ID>', 10000000, 1000000, '/path/to/nft/json/metadata', '/path/to/mint/script', '/path/to/mint.skey')
+    mint = Mint('<POLICY_ID>', 10000000, 1000000, '/path/to/nft/json/metadata', '/path/to/mint/script', '/path/to/mint.skey', whitelist)
 
     # Blockfrost is used in the code to validate where the UTXO sent to the payment address came from
     blockfrost_api = BlockfrostApi('<BLOCKFROST_PROJ_ID>', mainnet=True)
@@ -45,10 +48,12 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 --output-dir output/ \
                 [--single-vend-max <MAX_SINGLE_VEND>] \
                 [--vend-randomly] \
+                [--no-whitelist | \
+                  [--single-use-asset-whitelist <WHITELIST_DIR> | --unlimited-asset-whitelist <WHITELIST_DIR>]] \
                 [--donation]
 ## Installation
 This package is available from [PyPI](https://pypi.org/) and can be installed using ``pip3``.  Python <3.8 is currently unsupported at this time.
-        
+
     pip3 install cardano-nft-vending-machine
 ## APIs
 All API documentation is auto-generated from ``pydoc3``-formatted multi-line strings in the source code.  A mirror of ``master`` is hosted on [Github Pages](https://thaddeusdiamond.github.io/cardano-nft-vending-machine/cardano/).

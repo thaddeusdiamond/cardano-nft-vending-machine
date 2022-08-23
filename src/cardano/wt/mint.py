@@ -39,13 +39,14 @@ class Mint(object):
                     return validator[key]
         return None
 
-    def __init__(self, policy, price, donation, nfts_dir, script, sign_key):
+    def __init__(self, policy, price, donation, nfts_dir, script, sign_key, whitelist):
         self.policy = policy
         self.price = price
         self.donation = donation
         self.nfts_dir = nfts_dir
         self.script = script
         self.sign_key = sign_key
+        self.whitelist = whitelist
 
         self.initial_slot = Mint.__read_validator('after', 'slot', script)
         self.expiration_slot = Mint.__read_validator('before', 'slot', script)
@@ -57,6 +58,8 @@ class Mint(object):
                 print(f"Validating {filename}")
                 validated_nft = self.__validated_nft(json.load(file), existing)
                 existing.append(validated_nft)
+        print(f"Validating whitelist of type {self.whitelist.__name__})")
+        self.whitelist.validate()
 
     def __validated_nft(self, nft, existing):
         if len(nft.keys()) != 1:

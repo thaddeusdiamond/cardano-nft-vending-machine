@@ -12,6 +12,8 @@ from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.mint import Mint
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.utxo import Utxo
+from cardano.wt.whitelist.no_whitelist import NoWhitelist
+from cardano.wt.whitelist.asset_whitelist import SingleUseWhitelist, UnlimitedWhitelist
 
 # Blockfrost gives the wrong format back for protocol parameters so here's a translator
 BLOCKFROST_PROTOCOL_TRANSLATOR = {
@@ -40,6 +42,7 @@ BLOCKFROST_PROTOCOL_TRANSLATOR = {
 # Vending machine internal constants (global required)
 LOCKED_SUBDIR = 'in_proc'
 METADATA_SUBDIR = 'metadata'
+WL_CONSUMED_DIR_SUBDIR = 'wl_consumed'
 WAIT_TIMEOUT = 15
 
 _program_is_running = True
@@ -58,6 +61,7 @@ def ensure_output_dirs_made(output_dir):
     os.makedirs(os.path.join(output_dir, LOCKED_SUBDIR), exist_ok=True)
     os.makedirs(os.path.join(output_dir, METADATA_SUBDIR), exist_ok=True)
     os.makedirs(os.path.join(output_dir, CardanoCli.TXN_DIR), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, WL_CONSUMED_DIR_SUBDIR), exist_ok=True)
 
 def generate_cardano_cli_protocol(translator, blockfrost_input):
     translated = {}
@@ -80,6 +84,15 @@ def rewritten_protocol_params(blockfrost_protocol_json, output_dir):
     with open(protocol_filename, 'w') as protocol_file:
         json.dump(cardanocli_protocol_json, protocol_file)
     return protocol_filename
+
+def get_whitelist_type(args, wl_output_dir):
+    assert(not (args.no_whitelist and (args.single_use_asset_whitelist or args.unlimited_asset_whitelist)))
+    if args.no_whitelist:
+        return NoWhitelist()
+    if args.single_use_asset_whitelist:
+        return SingleUseWhitelist(args.single_use_asset_whitelist, wl_output_dir)
+    if args.unlimited_asset_whitelist:
+        return UnlimitedWhitelist(args.unlimited_asset_whitelist, wl_output_dir)
 
 def get_donation_amt(donate, free_mint):
     return 0 if ((not donate) or free_mint) else 1000000
@@ -110,6 +123,13 @@ def get_parser():
     parser.add_argument('--single-vend-max', type=int, required=False, help='Backend limit enforced on NFTs vended at once (recommended)')
     parser.add_argument('--vend-randomly', action='store_true', help='Randomly pick from the metadata directory (using seed 321) when listing')
     parser.add_argument('--donation', action='store_true', help='Send a 1₳ donation per txn to the dev (no worries!)')
+
+    whitelist = parser.add_mutually_exclusive_group(required=True)
+    whitelist.add_argument('--no-whitelist', action='store_true', help='No whitelist required for mints')
+    asset_whitelist = whitelist.add_mutually_exclusive_group()
+    asset_whitelist.add_argument('--single-use-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have empty files where the filenames represent asset IDs on the whitelist.  Each asset can mint exactly 1 NFT')
+    asset_whitelist.add_argument('--unlimited-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have empty files where the filenames represent asset IDs on the whitelist.  Each asset can mint unlimited NFTs')
+
     return parser
 
 if __name__ == "__main__":
@@ -121,7 +141,8 @@ if __name__ == "__main__":
 
     _mint_price = get_mint_price(_args.mint_price, _args.free_mint)
     _donation_amt = get_donation_amt(_args.donation, _args.free_mint)
-    _mint = Mint(_args.mint_policy, _mint_price, _donation_amt, _args.metadata_dir, _args.mint_script, _args.mint_sign_key)
+    _whitelist = get_whitelist_type(_args, os.path.join(_args.output_dir, WL_CONSUMED_DIR_SUBDIR))
+    _mint = Mint(_args.mint_policy, _mint_price, _donation_amt, _args.metadata_dir, _args.mint_script, _args.mint_sign_key, _whitelist)
     _mint.validate()
 
     _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet)

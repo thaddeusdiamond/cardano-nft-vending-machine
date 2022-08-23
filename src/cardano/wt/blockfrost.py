@@ -80,12 +80,9 @@ class BlockfrostApi(object):
             BlockfrostApi._MAX_POST_RETRIES
         )
 
-    def get_input_address(self, txn_hash):
+    def get_inputs(self, txn_hash):
         utxo_metadata = self.__call_get_api(f"txs/{txn_hash}/utxos")
-        utxo_inputs = set([utxo_input['address'] for utxo_input in utxo_metadata['inputs']])
-        if len(utxo_inputs) < 1:
-            raise ValueError(f"Txn hash {txn_hash} has no valid addresses({utxo_inputs}), aborting...")
-        return utxo_inputs.pop()
+        return utxo_metadata['inputs']
 
     def get_utxos(self, address, exclusions):
         available_utxos = set()
