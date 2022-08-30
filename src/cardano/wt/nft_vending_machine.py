@@ -103,7 +103,7 @@ class NftVendingMachine(object):
         nft_names = self.__generate_nft_names_from(nft_metadata_file)
 
         total_name_chars = sum([len(name) for name in self.__get_nft_names_from(nft_metadata_file)])
-        user_rebate = Mint.RebateCalculator.calculateRebateFor(NftVendingMachine.__SINGLE_POLICY, num_mints, total_name_chars) if self.mint.price else 0
+        user_rebate = Mint.RebateCalculator.calculate_rebate_for(NftVendingMachine.__SINGLE_POLICY, num_mints, total_name_chars) if self.mint.price else 0
         net_profit = gross_profit - self.mint.donation - user_rebate
         if net_profit and net_profit < Utxo.MIN_UTXO_VALUE:
             raise ValueError(f"Rebate of {user_rebate} would leave too small profit of {net_profit}")
