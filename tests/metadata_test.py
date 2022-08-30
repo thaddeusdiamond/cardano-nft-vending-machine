@@ -4,15 +4,12 @@ import pytest
 import shutil
 import tempfile
 
+from test_utils import data_file_path
+
 from cardano.wt.mint import Mint
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
 CARDANO_VM_TEST = 'cardano-vm-test-'
-
-def data_file_path(request, data_file):
-    current_dir = os.path.dirname(request.fspath)
-    data_filepath = os.path.join('data', data_file)
-    return os.path.join(current_dir, data_filepath)
 
 class VmTestConfig(object):
 

@@ -11,6 +11,7 @@ class Mint(object):
 
     _METADATA_KEY = '721'
     _METADATA_MAXLEN = 64
+    _MIN_PRICE = 5000000
     _POLICY_LEN = 56
 
     class RebateCalculator(object):
@@ -53,6 +54,8 @@ class Mint(object):
         self.expiration_slot = Mint.__read_validator('before', 'slot', script)
 
     def validate(self):
+        if self.price and self.price < Mint._MIN_PRICE:
+            raise ValueError(f"Minimum mint price is {Mint._MIN_PRICE}, you entered {self.price}")
         existing = []
         for filename in os.listdir(self.nfts_dir):
             with open(os.path.join(self.nfts_dir, filename), 'r') as file:

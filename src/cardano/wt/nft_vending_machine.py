@@ -35,6 +35,7 @@ class NftVendingMachine(object):
         self.blockfrost_api = blockfrost_api
         self.cardano_cli = cardano_cli
         self.donation_addr = NftVendingMachine.__get_donation_addr(mainnet)
+        self.__is_validated = False
 
     def __get_tx_out_args(self, input_addr, change, nft_names, total_profit, total_donation):
         user_tokens = filter(None, [input_addr, str(change), CardanoCli.named_asset_str(self.mint.policy, nft_names)])
@@ -127,6 +128,8 @@ class NftVendingMachine(object):
         self.mint.whitelist.consume(utxo_inputs, num_mints)
 
     def vend(self, output_dir, locked_subdir, metadata_subdir, exclusions):
+        if not self.__is_validated:
+            raise ValueError('Attempting to vend from non-validated vending machine')
         mint_reqs = self.blockfrost_api.get_utxos(self.payment_addr, exclusions)
         for mint_req in mint_reqs:
             try:
@@ -136,3 +139,9 @@ class NftVendingMachine(object):
                 print(f"WARNING: Uncaught exception for {mint_req}, not adding to exclusions (MANUALLY DEBUG THIS)")
                 print(traceback.format_exc())
                 time.sleep(NftVendingMachine.__ERROR_WAIT)
+
+    def validate(self):
+        if self.payment_addr == self.profit_addr:
+            raise ValueError(f"Payment address and profit address ({self.payment_addr}) cannot be the same!")
+        self.mint.validate()
+        self.__is_validated = True

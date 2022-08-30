@@ -99,15 +99,13 @@ def get_donation_amt(donate, free_mint):
 
 def get_mint_price(mint_price, free_mint):
     assert(not (free_mint and mint_price))
-    if mint_price and mint_price < Utxo.MIN_UTXO_VALUE:
-        raise ValueError(f'Provided mint price of {mint_price} but minimum allowed is {Utxo.MIN_UTXO_VALUE}')
     return 0 if free_mint else mint_price
 
 def get_parser():
     parser = argparse.ArgumentParser(description='Generate NFTs for Mild Tangs')
 
     price = parser.add_mutually_exclusive_group(required=True)
-    price.add_argument('--mint-price', type=int, help='Price in lovelace that is being charged for each NFT (min 1₳)')
+    price.add_argument('--mint-price', type=int, help='Price in LOVELACE that is being charged for each NFT (min 5₳)')
     price.add_argument('--free-mint', action='store_true', help='Perform a free mint (user rebates all ADA')
 
     parser.add_argument('--payment-addr', required=True, help='Cardano address where mint payments are sent to')
@@ -143,7 +141,6 @@ if __name__ == "__main__":
     _donation_amt = get_donation_amt(_args.donation, _args.free_mint)
     _whitelist = get_whitelist_type(_args, os.path.join(_args.output_dir, WL_CONSUMED_DIR_SUBDIR))
     _mint = Mint(_args.mint_policy, _mint_price, _donation_amt, _args.metadata_dir, _args.mint_script, _args.mint_sign_key, _whitelist)
-    _mint.validate()
 
     _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet)
 
@@ -164,6 +161,7 @@ if __name__ == "__main__":
             _cardano_cli,
             mainnet=_args.mainnet
     )
+    _nft_vending_machine.validate()
     print(f"Initialized vending machine with the following parameters")
     print(_nft_vending_machine.as_json())
 
