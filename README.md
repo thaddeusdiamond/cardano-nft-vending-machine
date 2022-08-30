@@ -62,10 +62,23 @@ Building this project creates a ``.whl`` file for uploading to [PyPI]() or insta
 
 	python3 -m build
 ## Test
+To enhance the output of tests, we recommend installing [pytest-clarity](https://pypi.org/project/pytest-clarity/):
+
+  pip3 install pytest-clarity
 Tests are stored in the ``tests`` subdirectory and are run using [pytest](https://docs.pytest.org/en/7.1.x/).  To invoke the tests:
 
-	python3 -m pytest tests
+	python3 -m pytest -vv
 Pull requests to ``master`` require 0 failing tests in order to be merged.
+
+## Code Coverage
+We use [coverage](https://coverage.readthedocs.io/en/6.4.4/) to measure code coverage from our pytests across the code base.  To run a full test suite with code coverage metrics, invoke:
+
+	python3 -m coverage run --source=src/ --branch -m pytest -vv
+Note that you must *separately* generate the report on your CLI using the following:
+
+	python3 -m coverage html
+We aim to maintain 80% coverage (lines + branches) if possible.
+
 ## Documentation
 Documentation is stored in multi-line comments inside the source code and should be generated using the ``pdoc3`` package as follows:
 

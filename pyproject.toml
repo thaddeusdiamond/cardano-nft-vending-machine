@@ -31,3 +31,8 @@ where = ["src"]
 include = ["cardano*"] 
 exclude = ["cardano.tests*"] 
 namespaces = false
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "src"
+]

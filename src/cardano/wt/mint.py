@@ -10,6 +10,7 @@ Representation of the current minting process.
 class Mint(object):
 
     _METADATA_KEY = '721'
+    _METADATA_MAXLEN = 64
     _POLICY_LEN = 56
 
     class RebateCalculator(object):
@@ -54,28 +55,40 @@ class Mint(object):
     def validate(self):
         existing = []
         for filename in os.listdir(self.nfts_dir):
-            with open(filename, 'r') as file:
+            with open(os.path.join(self.nfts_dir, filename), 'r') as file:
                 print(f"Validating {filename}")
-                validated_nft = self.__validated_nft(json.load(file), existing)
+                validated_nft = self.__validated_nft(json.load(file), existing, filename)
                 existing.append(validated_nft)
-        print(f"Validating whitelist of type {self.whitelist.__name__})")
+        print(f"Validating whitelist of type {self.whitelist.__class__}")
         self.whitelist.validate()
 
-    def __validated_nft(self, nft, existing):
+    def __validate_str_lengths(self, metadata):
+        if type(metadata) is dict:
+            for key, value in metadata.items():
+                self.__validate_str_lengths(value)
+        if type(metadata) is str and len(metadata) > Mint._METADATA_MAXLEN:
+            raise ValueError(f"Encountered metadata value >{Mint._METADATA_MAXLEN} chars '{metadata}'")
+
+    def __validated_nft(self, nft, existing, filename):
         if len(nft.keys()) != 1:
             raise ValueError(f"Incorrect # of keys ({len(nft.keys())}) found in file '{filename}'")
         if not Mint._METADATA_KEY in nft:
             raise ValueError(f"Missing top-level metadata key ({Mint._METADATA_KEY}) in file '{filename}'")
         nft_policy_obj = nft[Mint._METADATA_KEY]
-        if len(nft_policy_obj.keys()) != 1:
-            raise ValueError(f"Incorrect # of policy keys ({len(nft_policy_arr.keys())}) found in file '{filename}'")
-        policy = list(nft_policy_obj.keys())[0]
+        if len(nft_policy_obj.keys()) == 0:
+            raise ValueError(f"No policy keys found in file '{filename}'")
+        if len(nft_policy_obj.keys()) > 2:
+            raise ValueError(f"Too many policy keys ({len(nft_policy_obj.keys())}) found in file '{filename}'")
+        if len(nft_policy_obj.keys()) == 2 and not 'version' in nft_policy_obj.keys():
+            raise ValueError(f"Found 2 keys but 1 is not 'version' (file '{filename}') [see CIP-0025]")
+        policy = sorted(list(nft_policy_obj.keys()))[0]
         if len(policy) != Mint._POLICY_LEN:
             raise ValueError(f"Incorrect looking policy {policy} in file '{filename}'")
-        asset_obj = nft_policy_arr[policy]
+        asset_obj = nft_policy_obj[policy]
         if len(asset_obj.keys()) != 1:
-            raise ValueError(f"Incorrect # of assets ({len(nft_policy_arr.keys())}) found in file '{filename}'")
+            raise ValueError(f"Incorrect # of assets ({len(asset_obj.keys())}) found in file '{filename}'")
         asset_name = list(asset_obj.keys())[0]
         if asset_name in existing:
             raise ValueError(f"Found duplicate asset name '{asset_name}' in file '{filename}'")
+        self.__validate_str_lengths(asset_obj)
         return asset_name
