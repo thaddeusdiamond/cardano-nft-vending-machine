@@ -35,7 +35,7 @@ The library consists of several Python objects representing the mint process.  T
 ### ``cardano_vending_machine.py``
 There is a sample vending machine script that is included in the ``src/`` directory to show how to invoke the library components.  Use ``-h`` to see detailed help or use a command like below:
 
-        src/cardano/wt/cardano_vending_machine.py \
+        python3 main.py \
                 --payment-addr <PAYMENT_ADDR> \
                 --payment-sign-key /FULL/PATH/TO/payment.skey \
                 --profit-addr <PROFIT_ADDR> \
@@ -51,6 +51,7 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 [--no-whitelist | \
                   [--single-use-asset-whitelist <WHITELIST_DIR> | --unlimited-asset-whitelist <WHITELIST_DIR>]] \
                 [--donation]
+                [--mainnet]
 ## Installation
 This package is available from [PyPI](https://pypi.org/) and can be installed using ``pip3``.  Python <3.8 is currently unsupported at this time.
 
