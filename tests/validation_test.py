@@ -1,7 +1,7 @@
 import os
 import sys
 
-from test_utils import data_file_path
+from test_utils.fs import data_file_path
 
 from cardano.wt.mint import Mint
 from cardano.wt.nft_vending_machine import NftVendingMachine

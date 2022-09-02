@@ -1,7 +1,7 @@
 import os
 import tempfile
 
-from test_utils import data_file_path
+from test_utils.fs import data_file_path
 
 CARDANO_VM_TEST = 'cardano-vm-test-'
 

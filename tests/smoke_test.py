@@ -3,14 +3,13 @@ import os
 import pytest
 import signal
 import sys
-import time
 
-from test_utils import protocol_file_path, secrets_file_path
 from test_utils.address import Address
 from test_utils.keys import KeyPair
 from test_utils.policy import Policy
 from test_utils.vending_machine import VendingMachineTestConfig
 
+from test_utils.fs import protocol_file_path, secrets_file_path
 from cardano.wt.blockfrost import BlockfrostApi
 from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.mint import Mint

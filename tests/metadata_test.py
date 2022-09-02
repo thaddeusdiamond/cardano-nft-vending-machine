@@ -3,7 +3,7 @@ import os
 import pytest
 import shutil
 
-from test_utils import data_file_path
+from test_utils.fs import data_file_path
 from test_utils.vending_machine import VendingMachineTestConfig
 
 from cardano.wt.mint import Mint
