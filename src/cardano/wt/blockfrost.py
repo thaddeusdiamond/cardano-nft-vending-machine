@@ -128,4 +128,4 @@ class BlockfrostApi(object):
     def submit_txn(self, signed_file):
         with open(signed_file, 'r') as signed_filehandle:
             tx_cbor = json.load(signed_filehandle)['cborHex']
-        self.__call_post_api('application/cbor', '/tx/submit', bytes.fromhex(tx_cbor))
+        return self.__call_post_api('application/cbor', '/tx/submit', bytes.fromhex(tx_cbor))

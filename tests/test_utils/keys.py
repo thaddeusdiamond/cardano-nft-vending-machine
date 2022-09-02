@@ -8,6 +8,9 @@ class KeyPair(object):
         keypair.initialize()
         return keypair
 
+    def existing(directory, prefix):
+        return KeyPair(directory, prefix)
+
     def __init__(self, directory, prefix):
         self.skey_path = os.path.join(directory, f"{prefix}.skey")
         self.vkey_path = os.path.join(directory, f"{prefix}.vkey")
