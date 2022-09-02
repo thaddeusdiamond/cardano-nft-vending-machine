@@ -66,7 +66,7 @@ Building this project creates a ``.whl`` file for uploading to [PyPI]() or insta
 To enhance the output of tests, we recommend installing [pytest-clarity](https://pypi.org/project/pytest-clarity/):
 
   pip3 install pytest-clarity
-Tests are stored in the ``tests`` subdirectory and are run using [pytest](https://docs.pytest.org/en/7.1.x/).  To invoke the tests:
+Tests are stored in the ``tests`` subdirectory and are run using [pytest](https://docs.pytest.org/en/7.1.x/).  Before invoking the tests you will need to create files at ``tests/secrets/blockfrost-preprod.key`` and ``tests/secrets/blockfrost-preview.key`` with the respective network keys to make sure the test suite can access the test network blockchains (see [blockfrost.io docs](https://docs.blockfrost.io/) for more details).  Then, to invoke the tests:
 
 	python3 -m pytest -vv
 Pull requests to ``master`` require 0 failing tests in order to be merged.

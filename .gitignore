@@ -134,3 +134,6 @@ dmypy.json
 
 # Mac temporary files
 **/.DS_Store
+
+# Secrets for running integration tests
+tests/secrets

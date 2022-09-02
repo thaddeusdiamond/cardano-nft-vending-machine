@@ -2,26 +2,16 @@ import json
 import os
 import pytest
 import shutil
-import tempfile
 
 from test_utils import data_file_path
+from test_utils.vending_machine import VendingMachineTestConfig
 
 from cardano.wt.mint import Mint
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
-CARDANO_VM_TEST = 'cardano-vm-test-'
-
-class VmTestConfig(object):
-
-    def __init__(self):
-        self.metadata_dir = tempfile.mkdtemp(prefix=CARDANO_VM_TEST)
-
-    def copy_datafile_to_metadata(self, data_file, request):
-        shutil.copy(data_file_path(request, data_file), self.metadata_dir)
-
 @pytest.fixture
 def vm_test_config():
-    return VmTestConfig()
+    return VendingMachineTestConfig()
 
 def test_rejects_if_no_script_file():
     try:

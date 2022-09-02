@@ -11,6 +11,9 @@ Repreentation of the Blockfrost web API used in retrieving metadata about txn i/
 """
 class BlockfrostApi(object):
 
+    PREPROD_MAGIC = '1'
+    PREVIEW_MAGIC = '2'
+
     _API_CALLS_PER_SEC = 10
     _APPLICATION_JSON = 'application/json'
     _BACKOFF_SEC = 10
@@ -20,13 +23,16 @@ class BlockfrostApi(object):
     _MAX_BURST = 500
     _UTXO_LIST_LIMIT = 100
 
-    def __init__(self, project, mainnet=False):
+    def __init__(self, project, mainnet=False, preview=False, max_get_retries=_MAX_GET_RETRIES, max_post_retries=_MAX_POST_RETRIES):
         self.project = project
         self.mainnet = mainnet
+        self.preview = preview
         self.built_up_burst = BlockfrostApi._MAX_BURST
         self.bursting = False
         self.curr_sec = int(time.time())
         self.curr_calls = 0
+        self.max_get_retries = max_get_retries
+        self.max_post_retries = max_post_retries
 
     def __account_for_rate_limit(self):
         this_time = time.time()
@@ -49,7 +55,8 @@ class BlockfrostApi(object):
             time.sleep(1.0  / BlockfrostApi._API_CALLS_PER_SEC)
 
     def __get_api_base(self):
-        return f"https://cardano-{'mainnet' if self.mainnet else 'testnet'}.blockfrost.io/api/v0"
+        identifier = 'mainnet' if self.mainnet else 'preview' if self.preview else 'preprod'
+        return f"https://cardano-{identifier}.blockfrost.io/api/v0"
 
     def __call_with_retries(self, call_func, max_retries):
         self.__account_for_rate_limit()
@@ -71,14 +78,22 @@ class BlockfrostApi(object):
     def __call_get_api(self, resource):
         return self.__call_with_retries(
             lambda: requests.get(f"{self.__get_api_base()}/{resource}", headers={'project_id': self.project, 'Content-Type': BlockfrostApi._APPLICATION_JSON}),
-            BlockfrostApi._MAX_GET_RETRIES
+            self.max_get_retries
         )
 
     def __call_post_api(self, content_type, resource, data):
         return self.__call_with_retries(
             lambda: requests.post(f"{self.__get_api_base()}/{resource}", headers={'project_id': self.project, 'Content-Type': content_type}, data=data),
-            BlockfrostApi._MAX_POST_RETRIES
+            self.max_post_retries
         )
+
+    def get_assets(self, policy_id):
+        try:
+            return self.__call_get_api(f"assets/policy/{policy_id}")
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == HTTPStatus.NOT_FOUND:
+                return []
+            raise e
 
     def get_inputs(self, txn_hash):
         utxo_metadata = self.__call_get_api(f"txs/{txn_hash}/utxos")
