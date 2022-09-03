@@ -11,6 +11,12 @@ from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.mint import Mint
 from cardano.wt.utxo import Utxo
 
+class BadUtxoError(ValueError):
+
+    def __init__(self, utxo, message):
+        super().__init__(message)
+        self.utxo = utxo
+
 class NftVendingMachine(object):
 
     __SINGLE_POLICY = 1
@@ -63,8 +69,6 @@ class NftVendingMachine(object):
             with open(mint_metadata_orig, 'r') as mint_metadata_handle:
                 mint_metadata = json.load(mint_metadata_handle)
                 for nft_name, nft_metadata in mint_metadata['721'][self.mint.policy].items():
-                    if nft_name in combined_nft_metadata:
-                        raise ValueError(f"Duplicate NFT metadata for {nft_name} found")
                     combined_nft_metadata[nft_name] = nft_metadata
             mint_metadata_locked = os.path.join(output_dir, locked_subdir, mint_metadata_filename)
             shutil.move(mint_metadata_orig, mint_metadata_locked)
@@ -83,12 +87,12 @@ class NftVendingMachine(object):
         utxo_inputs = self.blockfrost_api.get_inputs(mint_req.hash)
         input_addrs = set([utxo_input['address'] for utxo_input in utxo_inputs])
         if len(input_addrs) < 1:
-            raise ValueError(f"Txn hash {txn_hash} has no valid addresses ({utxo_inputs}), aborting...")
+            raise BadUtxoError(mint_req, f"Txn hash {txn_hash} has no valid addresses ({utxo_inputs}), aborting...")
         input_addr = input_addrs.pop()
 
         lovelace_bals = [balance for balance in mint_req.balances if balance.policy == Utxo.Balance.LOVELACE_POLICY]
         if len(lovelace_bals) != 1:
-            raise ValueError(f"Found too many/few lovelace balances for UTXO {mint_req}")
+            raise BadUtxoError(mint_req, f"Found too many/few lovelace balances for UTXO {mint_req}")
 
         lovelace_bal = lovelace_bals.pop()
         num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price) if self.mint.price else 1
@@ -106,7 +110,7 @@ class NftVendingMachine(object):
         user_rebate = Mint.RebateCalculator.calculate_rebate_for(NftVendingMachine.__SINGLE_POLICY, num_mints, total_name_chars) if self.mint.price else 0
         net_profit = gross_profit - self.mint.donation - user_rebate
         if net_profit and net_profit < Utxo.MIN_UTXO_VALUE:
-            raise ValueError(f"Rebate of {user_rebate} would leave too small profit of {net_profit}")
+            raise BadUtxoError(mint_req, f"Rebate of {user_rebate} would leave too small profit of {net_profit}")
         print(f"Minimum rebate to user is {user_rebate}, net profit to vault is {net_profit}")
 
         tx_ins = [f"--tx-in {mint_req.hash}#{mint_req.ix}"]
@@ -135,8 +139,12 @@ class NftVendingMachine(object):
             try:
                 self.__do_vend(mint_req, output_dir, locked_subdir, metadata_subdir)
                 exclusions.add(mint_req)
+            except BadUtxoError as e:
+                print(f"UNRECOVERABLE UTXO ERROR\n{e.utxo}\n^--- REQUIRES INVESTIGATION")
+                print(traceback.format_exc())
+                exclusions.add(mint_req)
             except Exception as e:
-                print(f"WARNING: Uncaught exception for {mint_req}, not adding to exclusions (MANUALLY DEBUG THIS)")
+                print(f"WARNING: Uncaught exception for {mint_req}, not adding to exclusions (RETRY WILL BE ATTEMPTED)")
                 print(traceback.format_exc())
                 time.sleep(NftVendingMachine.__ERROR_WAIT)
 
