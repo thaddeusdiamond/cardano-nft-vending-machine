@@ -37,4 +37,4 @@ class Policy(object):
             'policyid',
             '--script-file',
             self.script_file_path
-        ]).decode(sys.stdout.encoding)
+        ]).decode(sys.stdout.encoding).strip()

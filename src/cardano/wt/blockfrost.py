@@ -95,6 +95,14 @@ class BlockfrostApi(object):
                 return []
             raise e
 
+    def get_asset(self, asset_id):
+        try:
+            return self.__call_get_api(f"assets/{asset_id}")
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == HTTPStatus.NOT_FOUND:
+                return None
+            raise e
+
     def get_inputs(self, txn_hash):
         utxo_metadata = self.__call_get_api(f"txs/{txn_hash}/utxos")
         return utxo_metadata['inputs']

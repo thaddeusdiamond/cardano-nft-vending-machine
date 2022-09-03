@@ -9,7 +9,7 @@ WAIT_BACKOFF = 30
 def await_payment(address, tx_hash, blockfrost_api):
     for i in range(WAIT_RETRIES):
         for utxo in blockfrost_api.get_utxos(address, []):
-            if utxo.hash == tx_hash:
+            if not tx_hash or utxo.hash == tx_hash:
                 return utxo
         time.sleep(WAIT_BACKOFF)
     raise ValueError(f"Failed to find {tx_hash} at {address}")

@@ -19,7 +19,6 @@ class VendingMachineTestConfig(object):
         self.buyers_dir = self.__create_test_dir('buyers')
         self.metadata_dir = self.__create_test_dir('metadata')
         self.locked_dir = self.__create_test_dir('locked')
-        self.output_dir = self.__create_test_dir('output')
         self.policy_dir = self.__create_test_dir('policy')
         self.payees_dir = self.__create_test_dir('payees')
         self.txn_dir = self.__create_test_dir(CardanoCli.TXN_DIR)
