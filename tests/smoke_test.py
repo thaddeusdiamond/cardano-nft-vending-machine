@@ -62,7 +62,6 @@ def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api):
             NoWhitelist()
     )
     cardano_cli = CardanoCli(
-            mainnet=MAINNET,
             protocol_params=protocol_file_path(request, get_params_file())
     )
 
@@ -107,7 +106,6 @@ def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api):
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
     cardano_cli = CardanoCli(
-            mainnet=MAINNET,
             protocol_params=protocol_file_path(request, get_params_file())
     )
     buyer = Address.new(

@@ -38,8 +38,8 @@ The library consists of several Python objects representing the mint process.  T
     # Blockfrost is used in the code to validate where the UTXO sent to the payment address came from
     blockfrost_api = BlockfrostApi('<BLOCKFROST_PROJ_ID>', mainnet=True)
 
-    # CardanoCli is a wrapper around the cardano-cli command (and uses the CARDANO_NODE_SOCKET_PATH env var)
-    cardano_cli = CardanoCli(mainnet=True, protocol_params='/path/to/protocol.json')
+    # CardanoCli is a wrapper around the cardano-cli command (used as a utility without any interaction with the network)
+    cardano_cli = CardanoCli(protocol_params='/path/to/protocol.json')
 
     # NftVendingMachine vends NFTs and needs to be called repeatedly (with a 25-vend max) so long as the mint period is open
     nft_vending_machine = NftVendingMachine('addr_payment', '/path/to/payment.skey', 'addr_profit', 25, mint, blockfrost_api, cardano_cli, mainnet=True)

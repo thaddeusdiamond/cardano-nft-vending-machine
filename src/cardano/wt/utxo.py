@@ -31,16 +31,3 @@ class Utxo(object):
 
     def __repr__(self):
         return f"{self.hash}#{self.ix} {self.balances}"
-
-    def from_cli(cli_str):
-        utxo_data = re.split('\s+', cli_str)
-        balance_strs = [balance.strip() for balance in ' '.join(utxo_data[2:]).split('+')]
-        balances = []
-        for balance_str in balance_strs:
-            try:
-                balances.append(Utxo.Balance(int(balance_str.split(' ')[0]), balance_str.split(' ')[1]))
-            except ValueError:
-                continue
-        return Utxo(utxo_data[0], utxo_data[1], balances)
-
-

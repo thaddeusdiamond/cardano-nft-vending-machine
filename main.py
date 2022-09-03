@@ -148,7 +148,7 @@ if __name__ == "__main__":
     _protocol_params = rewritten_protocol_params(_blockfrost_protocol_params, _args.output_dir)
     max_txn_fee = (_blockfrost_protocol_params['min_fee_a'] * _blockfrost_protocol_params['max_tx_size']) + _blockfrost_protocol_params['min_fee_b']
     print(f"Max txn fee is a * size(tx) + b: {max_txn_fee}");
-    _cardano_cli = CardanoCli(mainnet=_args.mainnet, protocol_params=_protocol_params)
+    _cardano_cli = CardanoCli(protocol_params=_protocol_params)
 
     _nft_vending_machine = NftVendingMachine(
             _args.payment_addr,
