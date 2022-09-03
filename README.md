@@ -1,5 +1,23 @@
-# cardano-nft-vending-machine
-### A simple CNFT mint-and-vend machine Python library that leverages ``cardano-cli``
+<p align="center">
+  <h1 align="center">cardano-nft-vending-machine</h1>
+  <p align="center">A simple CNFT mint-and-vend machine Python library that leverages ``cardano-cli``</p>
+  <p align="center">
+    <a href="https://github.com/thaddeusdiamond/cardano-nft-vending-machine">
+      <img src="https://img.shields.io/github/commit-activity/m/thaddeusdiamond/cardano-vending-machine?style=for-the-badge" />
+    </a>
+    <a href="https://pypi.org/project/cardano-nft-vending-machine">
+      <img src="https://img.shields.io/pypi/v/cardano-nft-vending-machine?style=for-the-badge" />
+    </a>
+    <a href="https://pypi.org/project/cardano-nft-vending-machine">
+      <img src="https://img.shields.io/pypi/dw/cardano-nft-vending-machine?style=for-the-badge" />
+    </a>
+    <img src="https://img.shields.io/pypi/l/cardano-nft-vending-machine?style=for-the-badge" />
+    <a href="https://twitter.com/wildtangz">
+      <img src="https://img.shields.io/twitter/follow/wildtangz?style=for-the-badge&logo=twitter" />
+    </a>
+  </p>
+</p>
+
 ## :warning: **IMPORTANT**
 Interactions on the Cardano blockchain involve **REAL CURRENCY AND SHOULD NOT BE TREATED LIGHTLY**.  Some principles:
 * Never send money to an address you don't know and can't validate
