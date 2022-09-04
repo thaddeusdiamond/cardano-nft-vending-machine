@@ -43,14 +43,14 @@ class BlockfrostApi(object):
             if self.bursting:
                 self.built_up_burst = 0
             else:
-                self.built_up_burst = max(BlockfrostApi._MAX_BURST, self.built_up_burst + BlockfrostApi._BURST_TXN_PER_SEC)
+                self.built_up_burst = min(BlockfrostApi._MAX_BURST, self.built_up_burst + BlockfrostApi._BURST_TXN_PER_SEC)
             self.bursting = False
             self.curr_sec = this_sec
             self.curr_calls = 1
         if self.curr_calls == BlockfrostApi._API_CALLS_PER_SEC:
             print("Blockfrost API: ENTERING BURST, EXCEEDED ALLOWABLE API CALLS")
             self.bursting = True
-        if self.bursting and (self.curr_calls > BlockfrostApi._MAX_BURST):
+        if self.bursting and (self.curr_calls > self.built_up_burst):
             print("Blockfrost API: BEYOND BURST CAPABILITIES, MAY RESULT IN FATAL ERROR")
             time.sleep(1.0  / BlockfrostApi._API_CALLS_PER_SEC)
 
