@@ -20,7 +20,7 @@ def find_min_utxos_for_txn(requested, utxos, address):
     for utxo in utxos:
         used += lovelace_in(utxo)
         used_utxos.append(utxo)
-        if used >= requested:
+        if used == requested or used > requested + Utxo.MIN_UTXO_VALUE:
             return used_utxos
     raise ValueError(f"Funding address {address} does not have enough funds to complete the test")
 
@@ -30,7 +30,7 @@ def lovelace_in(utxo):
             return balance.lovelace
     raise ValueError(f"No lovelace found in {utxo}")
 
-def send_money(receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir):
+def send_money(receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_signers=[]):
     txn_id = int(time.time())
     tx_in_args = [f"--tx-in {utxo.hash}#{utxo.ix}" for utxo in utxo_inputs]
 
@@ -48,14 +48,17 @@ def send_money(receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost
         tx_out_args,
         0,
         None,
-        []
+        additional_args
     )
+
+    signers = additional_signers
+    signers.append(sender.keypair.skey_path)
 
     min_fee = cardano_cli.calculate_min_fee(
         raw_build_file,
         len(tx_in_args),
         len(tx_out_args),
-        CardanoCli._WITNESS_COUNT
+        len(signers)
     )
     tx_out_args[0] = f"--tx-out {receiver.address}+{requested - min_fee}"
 
@@ -66,7 +69,7 @@ def send_money(receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost
         tx_out_args,
         min_fee,
         None,
-        []
+        additional_args
     )
-    signed_file = cardano_cli.sign_txn([sender.keypair.skey_path], build_file)
+    signed_file = cardano_cli.sign_txn(signers, build_file)
     return blockfrost_api.submit_txn(signed_file)

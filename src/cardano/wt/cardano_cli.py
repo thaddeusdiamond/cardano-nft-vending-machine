@@ -11,8 +11,6 @@ cardano-cli *nix script representation in Python
 """
 class CardanoCli(object):
 
-    _WITNESS_COUNT = 1
-
     TXN_DIR = 'txn'
 
     def __init__(self, protocol_params=None):

@@ -4,6 +4,7 @@ import os
 import pytest
 import signal
 import sys
+import time
 
 from test_utils.address import Address
 from test_utils.keys import KeyPair
@@ -26,9 +27,12 @@ PADDING = 2 * 1000000
 VEND_RANDOMLY = True
 SINGLE_VEND_MAX = 30
 
-MAX_RETRIES = 1
+BLOCKFROST_RETRIES = 3
 MAINNET = os.getenv("TEST_ON_MAINNET", 'False').lower() in ('true', '1', 't')
 PREVIEW = os.getenv("TEST_ON_PREVIEW", 'False').lower() in ('true', '1', 't')
+
+BURN_RETRIES = 3
+BURN_WAIT = 30
 
 def get_params_file():
     return 'preview.json' if PREVIEW else 'preprod.json'
@@ -55,7 +59,7 @@ def blockfrost_api(request):
     blockfrost_keyfile_path = 'blockfrost-preview.key' if PREVIEW else 'blockfrost-preprod.key'
     with open(secrets_file_path(request, blockfrost_keyfile_path)) as blockfrost_keyfile:
         blockfrost_key = blockfrost_keyfile.read().strip()
-    return BlockfrostApi(blockfrost_key, mainnet=MAINNET, preview=PREVIEW, max_get_retries=MAX_RETRIES)
+    return BlockfrostApi(blockfrost_key, mainnet=MAINNET, preview=PREVIEW, max_get_retries=BLOCKFROST_RETRIES)
 
 def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api):
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
@@ -307,6 +311,11 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api):
             None,
             blockfrost_api
     )
+    minted_utxo = await_payment(
+            buyer.address,
+            profit_utxo.hash,
+            blockfrost_api
+    )
 
     created_assets = blockfrost_api.get_assets(policy.id)
     assert len(created_assets) == 1, f"Test did not create 1 asset under {policy.id}: {created_assets}"
@@ -330,3 +339,32 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api):
             vm_test_config.root_dir
     )
     await_payment(funder.address, drain_txn, blockfrost_api)
+
+    burn_args = [
+        f"--mint='-1 {policy.id}.{asset_name_hex}'",
+        f"--minting-script-file {policy.script_file_path}",
+        f"--invalid-hereafter {EXPIRATION}"
+    ]
+    burn_payment = lovelace_in(minted_utxo)
+    burn_txn = send_money(
+            funder,
+            burn_payment,
+            buyer,
+            [minted_utxo],
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir,
+            additional_args=burn_args,
+            additional_signers=[policy_keys.skey_path]
+    )
+    await_payment(funder.address, drain_txn, blockfrost_api)
+
+    burned = False
+    remaining_assets = None
+    for i in range(BURN_RETRIES):
+        remaining_assets = blockfrost_api.get_assets(policy.id)
+        if len(remaining_assets) == 1 and not int(remaining_assets[0]['quantity']):
+            burned = True
+            break
+        time.sleep(BURN_WAIT)
+    assert burned, f"Burned asset successfully but remaining assets under {policy.id}: {remaining_assets}"

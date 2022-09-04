@@ -20,7 +20,6 @@ class BadUtxoError(ValueError):
 class NftVendingMachine(object):
 
     __SINGLE_POLICY = 1
-    __WITNESS_COUNT = 3
     __ERROR_WAIT = 30
 
     def as_json(self):
@@ -119,7 +118,10 @@ class NftVendingMachine(object):
 
         tx_in_count = len(tx_ins)
         tx_out_count = len([tx_out for tx_out in tx_outs if tx_out])
-        fee = self.cardano_cli.calculate_min_fee(mint_build_tmp, tx_in_count, tx_out_count, NftVendingMachine.__WITNESS_COUNT)
+        signers = [self.payment_sign_key]
+        if num_mints:
+            signers.append(self.mint.sign_key)
+        fee = self.cardano_cli.calculate_min_fee(mint_build_tmp, tx_in_count, tx_out_count, len(signers))
 
         if net_profit:
             net_profit = net_profit - fee
@@ -127,7 +129,7 @@ class NftVendingMachine(object):
             change = change - fee
         tx_outs = self.__get_tx_out_args(input_addr, user_rebate + change, nft_names, net_profit, self.mint.donation)
         mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
-        mint_signed = self.cardano_cli.sign_txn([self.payment_sign_key, self.mint.sign_key], mint_build)
+        mint_signed = self.cardano_cli.sign_txn(signers, mint_build)
         self.blockfrost_api.submit_txn(mint_signed)
         self.mint.whitelist.consume(utxo_inputs, num_mints)
 
