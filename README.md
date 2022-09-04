@@ -50,7 +50,7 @@ The library consists of several Python objects representing the mint process.  T
         nft_vending_machine.vend('/path/to/output/dir', 'locking_subdir_name', 'metadata_subdir_name', already_completed)
         time.sleep(WAIT_TIMEOUT)
 
-### ``cardano_vending_machine.py``
+### ``main.py``
 There is a sample vending machine script that is included in the ``src/`` directory to show how to invoke the library components.  Use ``-h`` to see detailed help or use a command like below:
 
         python3 main.py \
@@ -73,7 +73,7 @@ There is a sample vending machine script that is included in the ``src/`` direct
 ## Installation
 This package is available from [PyPI](https://pypi.org/) and can be installed using ``pip3``.  Python <3.8 is currently unsupported at this time.
 
-    pip3 install cardano-nft-vending-machine
+	pip3 install cardano-nft-vending-machine
 ## APIs
 All API documentation is auto-generated from ``pydoc3``-formatted multi-line strings in the source code.  A mirror of ``master`` is hosted on [Github Pages](https://thaddeusdiamond.github.io/cardano-nft-vending-machine/cardano/).
 ## Build
@@ -83,10 +83,13 @@ Building this project creates a ``.whl`` file for uploading to [PyPI]() or insta
 ## Test
 To enhance the output of tests, we recommend installing [pytest-clarity](https://pypi.org/project/pytest-clarity/):
 
-  pip3 install pytest-clarity
+	pip3 install pytest-clarity
 Tests are stored in the ``tests`` subdirectory and are run using [pytest](https://docs.pytest.org/en/7.1.x/).  Before invoking the tests you will need to create files at ``tests/secrets/blockfrost-preprod.key`` and ``tests/secrets/blockfrost-preview.key`` with the respective network keys to make sure the test suite can access the test network blockchains (see [blockfrost.io docs](https://docs.blockfrost.io/) for more details).  Then, to invoke the tests:
 
 	python3 -m pytest -vv
+By default tests will run on the [preprod Cardano network](https://docs.cardano.org/cardano-testnet/getting-started#late-stagetestingnetworks).  To test against mainnet or the [preview Cardano network](https://docs.cardano.org/cardano-testnet/getting-started#early-stagetestingnetworks) you can use the `TEST_ON_MAINNET` or `TEST_ON_PREVIEW` environment variables as follows:
+
+	TEST_ON_PREVIEW=true python3 -m pytest -vv
 Pull requests to ``master`` require 0 failing tests in order to be merged.
 
 ## Code Coverage

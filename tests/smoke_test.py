@@ -26,8 +26,8 @@ VEND_RANDOMLY = True
 SINGLE_VEND_MAX = 30
 
 MAX_RETRIES = 1
-MAINNET = False
-PREVIEW = False
+MAINNET = os.getenv("TEST_ON_MAINNET", 'False').lower() in ('true', '1', 't')
+PREVIEW = os.getenv("TEST_ON_PREVIEW", 'False').lower() in ('true', '1', 't')
 
 @pytest.fixture
 def vm_test_config():
