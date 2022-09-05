@@ -3,7 +3,6 @@ import math
 import os
 import random
 import shutil
-import sys
 import time
 import traceback
 
@@ -35,7 +34,7 @@ class NftVendingMachine(object):
         self.payment_sign_key = payment_sign_key
         self.profit_addr = profit_addr
         self.vend_randomly = vend_randomly
-        self.single_vend_max = single_vend_max if single_vend_max else sys.maxsize
+        self.single_vend_max = single_vend_max
         self.mint = mint
         self.blockfrost_api = blockfrost_api
         self.cardano_cli = cardano_cli
@@ -154,4 +153,15 @@ class NftVendingMachine(object):
         if self.payment_addr == self.profit_addr:
             raise ValueError(f"Payment address and profit address ({self.payment_addr}) cannot be the same!")
         self.mint.validate()
+        max_rebate = self.__max_rebate_for(self.mint.validated_names)
+        if self.mint.price and self.mint.price < max_rebate + self.mint.donation + Utxo.MIN_UTXO_VALUE:
+            raise ValueError(f"Price of {self.mint.price} with donation of {self.mint.donation} could lead to a minUTxO error due to rebates")
         self.__is_validated = True
+
+    def __max_rebate_for(self, nft_names):
+        max_len = 0 if not nft_names else max([len(nft_name) for nft_name in nft_names])
+        return Mint.RebateCalculator.calculate_rebate_for(
+            NftVendingMachine.__SINGLE_POLICY,
+            self.single_vend_max,
+            max_len * self.single_vend_max
+        )

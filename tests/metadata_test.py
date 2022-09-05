@@ -1,17 +1,12 @@
 import json
 import os
-import pytest
 import shutil
 
 from test_utils.fs import data_file_path
-from test_utils.vending_machine import VendingMachineTestConfig
+from test_utils.vending_machine import vm_test_config, VendingMachineTestConfig
 
 from cardano.wt.mint import Mint
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
-
-@pytest.fixture
-def vm_test_config():
-    return VendingMachineTestConfig()
 
 def test_rejects_if_no_script_file():
     try:

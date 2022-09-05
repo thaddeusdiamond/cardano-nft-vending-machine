@@ -111,6 +111,7 @@ def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api):
 def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = MINT_PRICE + PADDING
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
@@ -205,6 +206,7 @@ def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api):
 def test_mints_single_asset(request, vm_test_config, blockfrost_api, expiration, asset_name):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = MINT_PRICE + PADDING
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
@@ -335,6 +337,7 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api, expiration,
 def test_mints_multiple_assets(request, vm_test_config, blockfrost_api):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = MINT_PRICE * SINGLE_VEND_MAX + PADDING
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
@@ -473,6 +476,7 @@ def test_mints_multiple_assets(request, vm_test_config, blockfrost_api):
 def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = MINT_PRICE * (SINGLE_VEND_MAX + 1) + PADDING
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
@@ -595,6 +599,7 @@ def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api):
 def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = int(MINT_PRICE / 2)
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
@@ -701,6 +706,7 @@ def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api):
 def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = MINT_PRICE * 2 + PADDING
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
@@ -801,6 +807,7 @@ def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api):
 def test_can_handle_multiple_input_addresses(request, vm_test_config, blockfrost_api):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = int((MINT_PRICE + PADDING) / 2)
     funding_inputs = find_min_utxos_for_txn(funding_amt * 2, funding_utxos, funder.address)
 

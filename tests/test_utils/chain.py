@@ -5,10 +5,10 @@ from cardano.wt.utxo import Utxo
 
 from test_utils.metadata import asset_name_hex
 
-BURN_RETRIES = 3
+BURN_RETRIES = 4
 BURN_WAIT = 30
 
-WAIT_RETRIES = 3
+WAIT_RETRIES = 4
 WAIT_BACKOFF = 30
 
 def await_payment(address, tx_hash, blockfrost_api):

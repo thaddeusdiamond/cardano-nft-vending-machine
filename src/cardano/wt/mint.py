@@ -54,14 +54,17 @@ class Mint(object):
         self.expiration_slot = Mint.__read_validator('before', 'slot', script)
 
     def validate(self):
+        if self.donation and self.donation < Utxo.MIN_UTXO_VALUE:
+            raise ValueError(f"Thank you for offering to donate {self.donation} but the minUTxO on Cardano is {Utxo.MIN_UTXO_VALUE} lovelace")
         if self.price and self.price < Mint._MIN_PRICE:
             raise ValueError(f"Minimum mint price is {Mint._MIN_PRICE}, you entered {self.price}")
-        existing = []
+        validated_names = []
         for filename in os.listdir(self.nfts_dir):
             with open(os.path.join(self.nfts_dir, filename), 'r') as file:
                 print(f"Validating {filename}")
-                validated_nft = self.__validated_nft(json.load(file), existing, filename)
-                existing.append(validated_nft)
+                validated_nft = self.__validated_nft(json.load(file), validated_names, filename)
+                validated_names.append(validated_nft)
+        self.validated_names = validated_names
         print(f"Validating whitelist of type {self.whitelist.__class__}")
         self.whitelist.validate()
 

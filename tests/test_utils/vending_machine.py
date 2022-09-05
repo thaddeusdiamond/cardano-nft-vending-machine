@@ -1,4 +1,5 @@
 import os
+import pytest
 import tempfile
 
 from test_utils.fs import data_file_path
@@ -25,3 +26,7 @@ class VendingMachineTestConfig(object):
 
     def copy_datafile_to_metadata(self, data_file, request):
         shutil.copy(data_file_path(request, data_file), self.metadata_dir)
+
+@pytest.fixture
+def vm_test_config():
+    return VendingMachineTestConfig()

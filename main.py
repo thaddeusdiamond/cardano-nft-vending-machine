@@ -118,7 +118,7 @@ def get_parser():
     parser.add_argument('--output-dir', required=True, help='Local folder where vending machine output stored')
     parser.add_argument('--blockfrost-project', required=True, help='Blockfrost project ID to use for retrieving chain data')
     parser.add_argument('--mainnet', action='store_true', help='Run the vending machine in production (default is testnet)')
-    parser.add_argument('--single-vend-max', type=int, required=False, help='Backend limit enforced on NFTs vended at once (recommended)')
+    parser.add_argument('--single-vend-max', type=int, required=True, help='Backend limit enforced on NFTs vended at once')
     parser.add_argument('--vend-randomly', action='store_true', help='Randomly pick from the metadata directory (using seed 321) when listing')
     parser.add_argument('--donation', action='store_true', help='Send a 1₳ donation per txn to the dev (no worries!)')
 

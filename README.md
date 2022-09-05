@@ -64,7 +64,7 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 --blockfrost-project <BLOCKFROST_PROJECT_ID> \
                 --metadata-dir metadata/ \
                 --output-dir output/ \
-                [--single-vend-max <MAX_SINGLE_VEND>] \
+                --single-vend-max <MAX_SINGLE_VEND> \
                 [--vend-randomly] \
                 [--no-whitelist | \
                   [--single-use-asset-whitelist <WHITELIST_DIR> | --unlimited-asset-whitelist <WHITELIST_DIR>]] \
