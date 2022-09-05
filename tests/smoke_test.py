@@ -281,9 +281,14 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api, expiration,
             vm_test_config.metadata_dir,
             set()
     )
-    profit_utxo = await_payment(profit.address, None, blockfrost_api)
-    minted_utxo = await_payment(buyer.address, profit_utxo.hash, blockfrost_api)
 
+    profit_utxo = await_payment(profit.address, None, blockfrost_api)
+    profit_txn = blockfrost_api.get_txn(profit_utxo.hash)
+    profit_expected = MINT_PRICE - Mint.RebateCalculator.calculate_rebate_for(1, 1, len(asset_name)) - int(profit_txn['fees'])
+    profit_actual = lovelace_in(profit_utxo)
+    assert profit_actual == profit_expected, f"Expected {profit_expected}, but actual was {profit_actual}"
+
+    minted_utxo = await_payment(buyer.address, profit_utxo.hash, blockfrost_api)
     created_assets = blockfrost_api.get_assets(policy.id)
     assert len(created_assets) == 1, f"Test did not create 1 asset under {policy.id}: {created_assets}"
     assert lovelace_in(minted_utxo, policy=policy, asset_name=asset_name) == 1, f"Buyer does not have {asset_name} in {minted_utxo}"
@@ -408,16 +413,18 @@ def test_mints_multiple_assets(request, vm_test_config, blockfrost_api):
             set()
     )
     profit_utxo = await_payment(profit.address, None, blockfrost_api)
-    minted_utxo = await_payment(buyer.address, profit_utxo.hash, blockfrost_api)
 
+    minted_utxo = await_payment(buyer.address, profit_utxo.hash, blockfrost_api)
     created_assets = blockfrost_api.get_assets(policy.id)
     assert len(created_assets) == SINGLE_VEND_MAX, f"Test did not create {SINGLE_VEND_MAX} assets under {policy.id}: {created_assets}"
     for asset_name in asset_names:
         assert lovelace_in(minted_utxo, policy=policy, asset_name=asset_name) == 1, f"Buyer does not have {asset_name} in {minted_utxo}"
 
+    asset_name_lens = 0
     for minted_asset in created_assets:
         minted_assetid = minted_asset['asset']
         asset_name = hex_to_asset_name(minted_assetid[56:])
+        asset_name_lens += len(asset_name)
         assert minted_assetid.startswith(policy.id), f"Minted asset {minted_assetid} does not belong to policy {policy.id}"
         assert asset_name in asset_names, f"Minted asset {minted_assetid} has unexpected name {asset_name}"
 
@@ -426,6 +433,12 @@ def test_mints_multiple_assets(request, vm_test_config, blockfrost_api):
         expected_metadata = metadata_json(request, asset_filename(asset_name))[asset_name]
         assert int(minted_asset['quantity']) == 1, f"Minted more than 1 quantity of {minted_asset}"
         assert minted_asset['onchain_metadata'] == expected_metadata, f"Mismatch in metadata: {minted_asset}"
+
+    rebate_expected = Mint.RebateCalculator.calculate_rebate_for(1, SINGLE_VEND_MAX, asset_name_lens)
+    profit_txn = blockfrost_api.get_txn(profit_utxo.hash)
+    profit_expected = (SINGLE_VEND_MAX * MINT_PRICE) - rebate_expected - int(profit_txn['fees'])
+    profit_actual = lovelace_in(profit_utxo)
+    assert profit_actual == profit_expected, f"Expected {profit_expected}, but actual was {profit_actual}"
 
     drain_payment = lovelace_in(profit_utxo)
     drain_txn = send_money(

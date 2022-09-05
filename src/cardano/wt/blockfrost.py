@@ -107,6 +107,14 @@ class BlockfrostApi(object):
         utxo_metadata = self.__call_get_api(f"txs/{txn_hash}/utxos")
         return utxo_metadata['inputs']
 
+    def get_txn(self, txn_hash):
+        try:
+            return self.__call_get_api(f"txs/{txn_hash}")
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == HTTPStatus.NOT_FOUND:
+                return None
+            raise e
+
     def get_utxos(self, address, exclusions):
         available_utxos = set()
         current_page = 0
