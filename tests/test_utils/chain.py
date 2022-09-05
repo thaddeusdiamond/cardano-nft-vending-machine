@@ -35,7 +35,7 @@ def burn_and_reclaim_tada(asset_names, policy, policy_keys, expiration, receiver
     ]
     if expiration:
         burn_args.append(f"--invalid-hereafter {expiration}")
-    send_money(receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=burn_args, additional_signers=[policy_keys.skey_path])
+    send_money([receiver], requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=burn_args, additional_keys=[policy_keys])
 
 def find_min_utxos_for_txn(requested, utxos, address):
     used_utxos = []
@@ -65,14 +65,16 @@ def policy_is_empty(policy, blockfrost_api):
         time.sleep(BURN_WAIT)
     return False
 
-def send_money(receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_signers=[]):
+def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_keys=[]):
     txn_id = int(time.time())
     tx_in_args = [f"--tx-in {utxo.hash}#{utxo.ix}" for utxo in utxo_inputs]
 
     utxo_inputs_total = sum([lovelace_in(utxo) for utxo in utxo_inputs])
-    remainder = utxo_inputs_total - requested
+    remainder = utxo_inputs_total - (requested * len(receivers))
 
-    tx_out_args = [f"--tx-out {receiver.address}+{requested}"]
+    tx_out_args = []
+    for receiver in receivers:
+        tx_out_args.append(f"--tx-out {receiver.address}+{requested}")
     if remainder > 0:
         tx_out_args.append(f"--tx-out {sender.address}+{remainder}")
 
@@ -86,8 +88,8 @@ def send_money(receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost
         additional_args
     )
 
-    signers = additional_signers
-    signers.append(sender.keypair.skey_path)
+    signers = additional_keys
+    signers.append(sender.keypair)
 
     min_fee = cardano_cli.calculate_min_fee(
         raw_build_file,
@@ -95,7 +97,7 @@ def send_money(receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost
         len(tx_out_args),
         len(signers)
     )
-    tx_out_args[0] = f"--tx-out {receiver.address}+{requested - min_fee}"
+    tx_out_args[0] = f"--tx-out {receivers[0].address}+{requested - min_fee}"
 
     build_file = cardano_cli.build_raw_txn(
         output_dir,
@@ -106,5 +108,6 @@ def send_money(receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost
         None,
         additional_args
     )
-    signed_file = cardano_cli.sign_txn(signers, build_file)
+    signing_files = [keypair.skey_path for keypair in signers]
+    signed_file = cardano_cli.sign_txn(signing_files, build_file)
     return blockfrost_api.submit_txn(signed_file)

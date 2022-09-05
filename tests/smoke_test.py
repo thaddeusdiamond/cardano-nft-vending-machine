@@ -123,7 +123,7 @@ def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api):
             get_network_magic()
     )
     funding_request_txn = send_money(
-            buyer,
+            [buyer],
             funding_amt,
             funder,
             funding_inputs,
@@ -140,7 +140,7 @@ def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api):
     )
     mint_payment = lovelace_in(buyer_utxo)
     payment_txn = send_money(
-            payment,
+            [payment],
             mint_payment,
             buyer,
             [buyer_utxo],
@@ -190,7 +190,7 @@ def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api):
 
     drain_payment = lovelace_in(payment_utxo)
     drain_txn = send_money(
-            funder,
+            [funder],
             drain_payment,
             payment,
             [payment_utxo],
@@ -217,7 +217,7 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api, expiration,
             get_network_magic()
     )
     funding_request_txn = send_money(
-            buyer,
+            [buyer],
             funding_amt,
             funder,
             funding_inputs,
@@ -234,7 +234,7 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api, expiration,
     )
     mint_payment = lovelace_in(buyer_utxo)
     payment_txn = send_money(
-            payment,
+            [payment],
             mint_payment,
             buyer,
             [buyer_utxo],
@@ -299,7 +299,7 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api, expiration,
 
     drain_payment = lovelace_in(profit_utxo)
     drain_txn = send_money(
-            funder,
+            [funder],
             drain_payment,
             profit,
             [profit_utxo],
@@ -323,7 +323,7 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api, expiration,
             blockfrost_api,
             vm_test_config.root_dir
     )
-    await_payment(funder.address, drain_txn, blockfrost_api)
+    await_payment(funder.address, burn_txn, blockfrost_api)
 
     assert policy_is_empty(policy, blockfrost_api), f"Burned asset successfully but {policy.id} has remaining_assets"
 
@@ -342,7 +342,7 @@ def test_mints_multiple_assets(request, vm_test_config, blockfrost_api):
             get_network_magic()
     )
     funding_request_txn = send_money(
-            buyer,
+            [buyer],
             funding_amt,
             funder,
             funding_inputs,
@@ -359,7 +359,7 @@ def test_mints_multiple_assets(request, vm_test_config, blockfrost_api):
     )
     mint_payment = lovelace_in(buyer_utxo)
     payment_txn = send_money(
-            payment,
+            [payment],
             mint_payment,
             buyer,
             [buyer_utxo],
@@ -429,7 +429,7 @@ def test_mints_multiple_assets(request, vm_test_config, blockfrost_api):
 
     drain_payment = lovelace_in(profit_utxo)
     drain_txn = send_money(
-            funder,
+            [funder],
             drain_payment,
             profit,
             [profit_utxo],
@@ -453,7 +453,7 @@ def test_mints_multiple_assets(request, vm_test_config, blockfrost_api):
             blockfrost_api,
             vm_test_config.root_dir
     )
-    await_payment(funder.address, drain_txn, blockfrost_api)
+    await_payment(funder.address, burn_txn, blockfrost_api)
 
     assert policy_is_empty(policy, blockfrost_api), f"Burned asset successfully but {policy.id} has remaining_assets"
 
@@ -472,7 +472,7 @@ def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api):
             get_network_magic()
     )
     funding_request_txn = send_money(
-            buyer,
+            [buyer],
             funding_amt,
             funder,
             funding_inputs,
@@ -489,7 +489,7 @@ def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api):
     )
     mint_payment = lovelace_in(buyer_utxo)
     payment_txn = send_money(
-            payment,
+            [payment],
             mint_payment,
             buyer,
             [buyer_utxo],
@@ -545,7 +545,7 @@ def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api):
 
     drain_payment = lovelace_in(profit_utxo)
     drain_txn = send_money(
-            funder,
+            [funder],
             drain_payment,
             profit,
             [profit_utxo],
@@ -575,7 +575,7 @@ def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api):
             blockfrost_api,
             vm_test_config.root_dir
     )
-    await_payment(funder.address, drain_txn, blockfrost_api)
+    await_payment(funder.address, burn_txn, blockfrost_api)
 
     assert policy_is_empty(policy, blockfrost_api), f"Burned asset successfully but {policy.id} has remaining_assets"
 
@@ -594,7 +594,7 @@ def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api):
             get_network_magic()
     )
     funding_request_txn = send_money(
-            buyer,
+            [buyer],
             funding_amt,
             funder,
             funding_inputs,
@@ -611,7 +611,7 @@ def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api):
     )
     mint_payment = lovelace_in(buyer_utxo)
     payment_txn = send_money(
-            payment,
+            [payment],
             mint_payment,
             buyer,
             [buyer_utxo],
@@ -675,7 +675,7 @@ def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api):
     minter_utxo = await_payment(buyer.address, None, blockfrost_api)
     drain_payment = lovelace_in(minter_utxo)
     drain_txn = send_money(
-            funder,
+            [funder],
             drain_payment,
             buyer,
             [minter_utxo],
@@ -700,7 +700,7 @@ def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api):
             get_network_magic()
     )
     funding_request_txn = send_money(
-            buyer,
+            [buyer],
             funding_amt,
             funder,
             funding_inputs,
@@ -717,7 +717,7 @@ def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api):
     )
     mint_payment = lovelace_in(buyer_utxo)
     payment_txn = send_money(
-            payment,
+            [payment],
             mint_payment,
             buyer,
             [buyer_utxo],
@@ -775,7 +775,7 @@ def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api):
     minter_utxo = await_payment(buyer.address, None, blockfrost_api)
     drain_payment = lovelace_in(minter_utxo)
     drain_txn = send_money(
-            funder,
+            [funder],
             drain_payment,
             buyer,
             [minter_utxo],
@@ -784,3 +784,142 @@ def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api):
             vm_test_config.root_dir
     )
     await_payment(funder.address, drain_txn, blockfrost_api)
+
+def test_can_handle_multiple_input_addresses(request, vm_test_config, blockfrost_api):
+    funder = get_funder_address(request)
+    funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    funding_amt = int((MINT_PRICE + PADDING) / 2)
+    funding_inputs = find_min_utxos_for_txn(funding_amt * 2, funding_utxos, funder.address)
+
+    cardano_cli = CardanoCli(
+            protocol_params=protocol_file_path(request, get_params_file())
+    )
+    buyer_one = Address.new(
+            vm_test_config.buyers_dir,
+            'buyer1',
+            get_network_magic()
+    )
+    buyer_two = Address.new(
+            vm_test_config.buyers_dir,
+            'buyer2',
+            get_network_magic()
+    )
+    funding_request_txn = send_money(
+            [buyer_one, buyer_two],
+            funding_amt,
+            funder,
+            funding_inputs,
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+
+    buyer_one_utxo = await_payment(buyer_one.address, funding_request_txn, blockfrost_api)
+    buyer_two_utxo = await_payment(buyer_two.address, funding_request_txn, blockfrost_api)
+    payment = Address.new(
+            vm_test_config.payees_dir,
+            'payment',
+            get_network_magic()
+    )
+    mint_payment = lovelace_in(buyer_one_utxo) + lovelace_in(buyer_two_utxo)
+    payment_txn = send_money(
+            [payment],
+            mint_payment,
+            buyer_one,
+            [buyer_one_utxo, buyer_two_utxo],
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir,
+            additional_keys=[buyer_two.keypair]
+    )
+    payment_utxo = await_payment(payment.address, payment_txn, blockfrost_api)
+
+    policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
+    policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
+    mint = Mint(
+            policy.id,
+            MINT_PRICE,
+            DONATION_AMT,
+            vm_test_config.metadata_dir,
+            policy.script_file_path,
+            policy_keys.skey_path,
+            NoWhitelist()
+    )
+    profit = Address.new(
+            vm_test_config.payees_dir,
+            'profit',
+            get_network_magic()
+    )
+    nft_vending_machine = NftVendingMachine(
+            payment.address,
+            payment.keypair.skey_path,
+            profit.address,
+            VEND_RANDOMLY,
+            SINGLE_VEND_MAX,
+            mint,
+            blockfrost_api,
+            cardano_cli,
+            mainnet=MAINNET
+    )
+    nft_vending_machine.validate()
+
+    asset_name = 'WildTangz 1'
+    create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
+
+    nft_vending_machine.vend(
+            vm_test_config.root_dir,
+            vm_test_config.locked_dir,
+            vm_test_config.metadata_dir,
+            set()
+    )
+
+    profit_utxo = await_payment(profit.address, None, blockfrost_api)
+
+    recipient = None
+    try:
+        minter_utxo = await_payment(buyer_one.address, profit_utxo.hash, blockfrost_api)
+        recipient = buyer_one
+    except ValueError:
+        pass
+
+    try:
+        minter_utxo = await_payment(buyer_two.address, profit_utxo.hash, blockfrost_api)
+        if recipient:
+            assert False, 'Found NFTs at buyer one and buyer two addresses!'
+        recipient = buyer_two
+    except ValueError:
+        pass
+
+    if not recipient:
+        assert False, 'Neither input address received the NFT back!'
+
+    qty_minted = lovelace_in(minter_utxo, policy=policy, asset_name=asset_name)
+    assert qty_minted == 1, 'Found {qty_minted} {asset_name} NFTs at {recipient}'
+
+    drain_payment = lovelace_in(profit_utxo)
+    drain_txn = send_money(
+            [funder],
+            drain_payment,
+            profit,
+            [profit_utxo],
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+    await_payment(funder.address, drain_txn, blockfrost_api)
+
+    burn_payment = lovelace_in(minter_utxo)
+    burn_txn = burn_and_reclaim_tada(
+            [asset_name],
+            policy,
+            policy_keys,
+            EXPIRATION,
+            funder,
+            burn_payment,
+            recipient,
+            [minter_utxo],
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+    await_payment(funder.address, burn_txn, blockfrost_api)
