@@ -41,10 +41,10 @@ def get_funder_address(request):
     secrets_dir = os.path.join(os.path.dirname(request.fspath), 'secrets')
     return Address.existing(KeyPair.existing(secrets_dir, 'funder'), get_network_magic())
 
-def new_policy_for(policy_keys, policy_dir, script_name):
+def new_policy_for(policy_keys, policy_dir, script_name, expiration=EXPIRATION):
     policy_keys = KeyPair.new(policy_dir, 'policy')
     script_file_path = os.path.join(policy_dir, script_name)
-    return Policy.new(script_file_path, policy_keys.vkey_path, EXPIRATION)
+    return Policy.new(script_file_path, policy_keys.vkey_path, expiration)
 
 @pytest.fixture
 def vm_test_config():
@@ -200,7 +200,9 @@ def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api):
     )
     await_payment(funder.address, drain_txn, blockfrost_api)
 
-def test_mints_single_asset(request, vm_test_config, blockfrost_api):
+@pytest.mark.parametrize("expiration", [EXPIRATION, None])
+@pytest.mark.parametrize("asset_name", ['WildTangz 1', 'WildTangz Sw₳gbito'])
+def test_mints_single_asset(request, vm_test_config, blockfrost_api, expiration, asset_name):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     funding_amt = MINT_PRICE + PADDING
@@ -243,7 +245,7 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api):
     payment_utxo = await_payment(payment.address, payment_txn, blockfrost_api)
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
-    policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
+    policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=expiration)
     mint = Mint(
             policy.id,
             MINT_PRICE,
@@ -271,7 +273,6 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api):
     )
     nft_vending_machine.validate()
 
-    asset_name = 'WildTangz 1'
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
@@ -313,7 +314,7 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api):
             [asset_name],
             policy,
             policy_keys,
-            EXPIRATION,
+            expiration,
             funder,
             burn_payment,
             buyer,

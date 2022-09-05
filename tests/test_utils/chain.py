@@ -31,9 +31,10 @@ def burn_and_reclaim_tada(asset_names, policy, policy_keys, expiration, receiver
     burn_names = '+'.join(['.'.join([f"-1 {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
     burn_args = [
         f"--mint='{burn_names}'",
-        f"--minting-script-file {policy.script_file_path}",
-        f"--invalid-hereafter {expiration}"
+        f"--minting-script-file {policy.script_file_path}"
     ]
+    if expiration:
+        burn_args.append(f"--invalid-hereafter {expiration}")
     send_money(receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=burn_args, additional_signers=[policy_keys.skey_path])
 
 def find_min_utxos_for_txn(requested, utxos, address):
