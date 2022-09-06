@@ -24,7 +24,7 @@ class NftVendingMachine(object):
     def as_json(self):
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
-    def __get_donation_addr(mainnet):
+    def _get_donation_addr(mainnet):
         if mainnet:
             return 'addr1qx2skanhkpgdhcyxnczydg3meqcv87z4vep7u2drrr6277v5entql0xseq6a4zs8j524wvwv6k46kpf8pt9ejjk6l9gs4g94mf'
         return 'addr_test1vrce7uwk8vcva5j4dmehrxprwy57x20yaz9cv9vqzjutnnsrgrfey'
@@ -38,7 +38,7 @@ class NftVendingMachine(object):
         self.mint = mint
         self.blockfrost_api = blockfrost_api
         self.cardano_cli = cardano_cli
-        self.donation_addr = NftVendingMachine.__get_donation_addr(mainnet)
+        self.donation_addr = NftVendingMachine._get_donation_addr(mainnet)
         self.__is_validated = False
 
     def __get_tx_out_args(self, input_addr, change, nft_names, total_profit, total_donation):
