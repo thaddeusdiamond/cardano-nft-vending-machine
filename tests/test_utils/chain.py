@@ -29,13 +29,20 @@ def assets_are_empty(remaining_assets):
 
 def burn_and_reclaim_tada(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir):
     burn_names = '+'.join(['.'.join([f"-1 {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
-    burn_args = [
-        f"--mint='{burn_names}'",
+    return mint_assets_directly(burn_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir)
+
+def mint_assets(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir):
+    mint_names = '+'.join(['.'.join([f"1 {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
+    return mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs=mint_names)
+
+def mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs=None):
+    mint_args = [
+        f"--mint='{mint_names}'",
         f"--minting-script-file {policy.script_file_path}"
     ]
     if expiration:
-        burn_args.append(f"--invalid-hereafter {expiration}")
-    send_money([receiver], requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=burn_args, additional_keys=[policy_keys])
+        mint_args.append(f"--invalid-hereafter {expiration}")
+    return send_money([receiver], requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=mint_args, additional_keys=[policy_keys], additional_outputs=outputs)
 
 def find_min_utxos_for_txn(requested, utxos, address):
     used_utxos = []
@@ -65,7 +72,7 @@ def policy_is_empty(policy, blockfrost_api):
         time.sleep(BURN_WAIT)
     return False
 
-def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_keys=[]):
+def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_keys=[], additional_outputs=None):
     txn_id = int(time.time())
     tx_in_args = [f"--tx-in {utxo.hash}#{utxo.ix}" for utxo in utxo_inputs]
 
@@ -77,6 +84,8 @@ def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfros
         tx_out_args.append(f"--tx-out {receiver.address}+{requested}")
     if remainder > 0:
         tx_out_args.append(f"--tx-out {sender.address}+{remainder}")
+    if additional_outputs:
+        tx_out_args[0] = f"--tx-out '{receivers[0].address}+{requested}+{additional_outputs}'"
 
     raw_build_file = cardano_cli.build_raw_txn(
         output_dir,
@@ -97,7 +106,10 @@ def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfros
         len(tx_out_args),
         len(signers)
     )
-    tx_out_args[0] = f"--tx-out {receivers[0].address}+{requested - min_fee}"
+    net_lovelace = requested - min_fee
+    tx_out_args[0] = f"--tx-out {receivers[0].address}+{net_lovelace}"
+    if additional_outputs:
+        tx_out_args[0] = f"--tx-out '{receivers[0].address}+{net_lovelace}+{additional_outputs}'"
 
     build_file = cardano_cli.build_raw_txn(
         output_dir,

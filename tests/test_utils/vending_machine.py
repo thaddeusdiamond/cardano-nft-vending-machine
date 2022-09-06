@@ -24,6 +24,9 @@ class VendingMachineTestConfig(object):
         self.payees_dir = self.__create_test_dir('payees')
         self.txn_dir = self.__create_test_dir(CardanoCli.TXN_DIR)
 
+        self.consumed_dir = os.path.join(self.root_dir, 'consumed')
+        self.whitelist_dir = os.path.join(self.root_dir, 'whitelist')
+
     def copy_datafile_to_metadata(self, data_file, request):
         shutil.copy(data_file_path(request, data_file), self.metadata_dir)
 

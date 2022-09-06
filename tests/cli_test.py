@@ -1,6 +1,5 @@
 import os
 import signal
-import subprocess
 
 from test_utils.address import Address
 from test_utils.keys import KeyPair
@@ -12,6 +11,7 @@ from test_utils.config import get_funder_address
 from test_utils.chain import await_payment, burn_and_reclaim_tada, find_min_utxos_for_txn, lovelace_in, policy_is_empty, send_money
 from test_utils.fs import protocol_file_path
 from test_utils.metadata import asset_filename, asset_name_hex, create_asset_files, hex_to_asset_name, metadata_json
+from test_utils.process import launch_py3_subprocess
 
 from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.mint import Mint
@@ -86,13 +86,7 @@ def test_cli_smoke(request, vm_test_config, blockfrost_api):
         network_args.append('--mainnet')
     if get_preview_env():
         network_args.append('--preview')
-
-    root_dir = os.path.dirname(os.path.dirname(request.fspath))
-    script_loc = os.path.join(root_dir, 'main.py')
-    proc_env = os.environ.copy()
-    curr_pythonpath = proc_env['PYTHONPATH'] if 'PYTHONPATH' in proc_env else ''
-    proc_env["PYTHONPATH"] = f"{os.path.join(root_dir, 'src')}:{curr_pythonpath}"
-    proc = subprocess.Popen(['python3', script_loc] + network_args + [
+    proc = launch_py3_subprocess('main.py', request, network_args + [
         '--payment-addr', payment.address,
         '--payment-sign-key', payment.keypair.skey_path,
         '--profit-addr', profit.address,
@@ -106,7 +100,7 @@ def test_cli_smoke(request, vm_test_config, blockfrost_api):
         '--single-vend-max', str(SINGLE_VEND_MAX),
         '--vend-randomly',
         '--no-whitelist'
-    ], env=proc_env)
+    ])
     profit_utxo = await_payment(profit.address, None, blockfrost_api)
     try:
         proc.send_signal(signal.SIGINT)
