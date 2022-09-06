@@ -28,21 +28,53 @@ def assets_are_empty(remaining_assets):
     return True
 
 def burn_and_reclaim_tada(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir):
+    burn_units = [f"{policy.id}{asset_name_hex(asset_name)}" for asset_name in asset_names]
     burn_names = '+'.join(['.'.join([f"-1 {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
-    return mint_assets_directly(burn_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir)
+    return mint_assets_directly(burn_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, burned=burn_units)
+
+def calculate_remainder_str(lovelace_requested, num_receivers, utxo_inputs, burned):
+    total_qty = {}
+    for utxo in utxo_inputs:
+        for balance in utxo.balances:
+            if not balance.policy in total_qty:
+                total_qty[balance.policy] = 0
+            total_qty[balance.policy] += balance.lovelace
+    total_qty[Utxo.Balance.LOVELACE_POLICY] -= lovelace_requested * num_receivers
+    for asset_name in burned:
+        total_qty[asset_name] -= 1
+    units_qtys = []
+    for (unit, qty) in total_qty.items():
+        if qty:
+            units_qtys.append(f"{qty} {cardano_cli_name(unit)}")
+    return '+'.join(units_qtys) if units_qtys else None
+
+def cardano_cli_name(unit):
+    return f"{unit[0:56]}.{unit[56:]}" if unit != Utxo.Balance.LOVELACE_POLICY else ''
 
 def mint_assets(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir):
     mint_names = '+'.join(['.'.join([f"1 {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
     return mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs=mint_names)
 
-def mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs=None):
+def mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs=None, burned=[]):
     mint_args = [
         f"--mint='{mint_names}'",
         f"--minting-script-file {policy.script_file_path}"
     ]
     if expiration:
         mint_args.append(f"--invalid-hereafter {expiration}")
-    return send_money([receiver], requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=mint_args, additional_keys=[policy_keys], additional_outputs=outputs)
+    return send_money(
+        [receiver],
+        requested,
+        sender,
+        utxo_inputs,
+        cardano_cli,
+        blockfrost_api,
+        output_dir,
+        additional_args=mint_args,
+        additional_keys=[policy_keys],
+        additional_outputs=outputs,
+        burned=burned
+    )
 
 def find_min_utxos_for_txn(requested, utxos, address):
     used_utxos = []
@@ -72,18 +104,16 @@ def policy_is_empty(policy, blockfrost_api):
         time.sleep(BURN_WAIT)
     return False
 
-def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_keys=[], additional_outputs=None):
+def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_keys=[], additional_outputs=None, burned=[]):
     txn_id = int(time.time())
     tx_in_args = [f"--tx-in {utxo.hash}#{utxo.ix}" for utxo in utxo_inputs]
-
-    utxo_inputs_total = sum([lovelace_in(utxo) for utxo in utxo_inputs])
-    remainder = utxo_inputs_total - (requested * len(receivers))
+    remainder = calculate_remainder_str(requested, len(receivers), utxo_inputs, burned)
 
     tx_out_args = []
     for receiver in receivers:
-        tx_out_args.append(f"--tx-out {receiver.address}+{requested}")
-    if remainder > 0:
-        tx_out_args.append(f"--tx-out {sender.address}+{remainder}")
+        tx_out_args.append(f"--tx-out '{receiver.address}+{requested}'")
+    if remainder:
+        tx_out_args.append(f"--tx-out '{sender.address}+{remainder}'")
     if additional_outputs:
         tx_out_args[0] = f"--tx-out '{receivers[0].address}+{requested}+{additional_outputs}'"
 
