@@ -28,6 +28,8 @@ PADDING = 2 * 1000000
 SINGLE_VEND_MAX = 30
 VEND_RANDOMLY = True
 
+MIN_UTXO_ON_REFUND = 1600000
+
 def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api):
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
@@ -170,6 +172,93 @@ def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api):
             vm_test_config.root_dir
     )
     await_payment(funder.address, drain_txn, blockfrost_api)
+
+def test_blacklists_min_utxo_errors(request, vm_test_config, blockfrost_api):
+    funder = get_funder_address(request)
+    funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
+    funding_amt = MIN_UTXO_ON_REFUND
+    funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
+
+    cardano_cli = CardanoCli(
+            protocol_params=protocol_file_path(request, get_params_file())
+    )
+    buyer = Address.new(
+            vm_test_config.buyers_dir,
+            'buyer',
+            get_network_magic()
+    )
+    funding_request_txn = send_money(
+            [buyer],
+            funding_amt,
+            funder,
+            funding_inputs,
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+
+    buyer_utxo = await_payment(buyer.address, funding_request_txn, blockfrost_api)
+    payment = Address.new(
+            vm_test_config.payees_dir,
+            'payment',
+            get_network_magic()
+    )
+    mint_payment = lovelace_in(buyer_utxo)
+    payment_txn = send_money(
+            [payment],
+            mint_payment,
+            buyer,
+            [buyer_utxo],
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+    payment_utxo = await_payment(payment.address, payment_txn, blockfrost_api)
+
+    policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
+    policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
+    mint = Mint(
+            policy.id,
+            MINT_PRICE,
+            DONATION_AMT,
+            vm_test_config.metadata_dir,
+            policy.script_file_path,
+            policy_keys.skey_path,
+            NoWhitelist()
+    )
+    profit = Address.new(
+            vm_test_config.payees_dir,
+            'profit',
+            get_network_magic()
+    )
+    nft_vending_machine = NftVendingMachine(
+            payment.address,
+            payment.keypair.skey_path,
+            profit.address,
+            VEND_RANDOMLY,
+            SINGLE_VEND_MAX,
+            mint,
+            blockfrost_api,
+            cardano_cli,
+            mainnet=get_mainnet_env()
+    )
+    nft_vending_machine.validate()
+
+    exclusions = set()
+    nft_vending_machine.vend(
+        vm_test_config.root_dir,
+        vm_test_config.locked_dir,
+        vm_test_config.metadata_dir,
+        exclusions
+    )
+
+    assert payment_utxo in exclusions, f"Exclusions did not have {payment_utxo}"
+
+    created_assets = blockfrost_api.get_assets(policy.id)
+    assert not created_assets, f"Somehow the test created assets under {policy.id}: {created_assets}"
+
+    # Have to end the test here because there is no way to drain... ADA is locked
 
 @pytest.mark.parametrize("expiration", [EXPIRATION, None])
 @pytest.mark.parametrize("asset_name", ['WildTangz 1', 'WildTangz Sw₳gbito'])

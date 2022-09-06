@@ -112,8 +112,6 @@ class NftVendingMachine(object):
         total_name_chars = sum([len(name) for name in self.__get_nft_names_from(nft_metadata_file)])
         user_rebate = Mint.RebateCalculator.calculate_rebate_for(NftVendingMachine.__SINGLE_POLICY, num_mints, total_name_chars) if self.mint.price else 0
         net_profit = gross_profit - self.mint.donation - user_rebate
-        if net_profit and net_profit < Utxo.MIN_UTXO_VALUE:
-            raise BadUtxoError(mint_req, f"Rebate of {user_rebate} would leave too small profit of {net_profit}")
         print(f"Minimum rebate to user is {user_rebate}, net profit to vault is {net_profit}")
 
         tx_ins = [f"--tx-in {mint_req.hash}#{mint_req.ix}"]
@@ -131,6 +129,10 @@ class NftVendingMachine(object):
             net_profit = net_profit - fee
         else:
             change = change - fee
+
+        if change and (change < Utxo.MIN_UTXO_VALUE) or net_profit and (net_profit < Utxo.MIN_UTXO_VALUE):
+            raise BadUtxoError(mint_req, f"UTxO left change of {change}, and net_profit of {net_profit}, causing a minUTxO error")
+
         tx_outs = self.__get_tx_out_args(input_addr, user_rebate + change, nft_names, net_profit, self.mint.donation)
         mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
         mint_signed = self.cardano_cli.sign_txn(signers, mint_build)
