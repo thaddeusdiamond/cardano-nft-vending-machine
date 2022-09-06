@@ -102,7 +102,7 @@ def get_mint_price(mint_price, free_mint):
     return 0 if free_mint else mint_price
 
 def get_parser():
-    parser = argparse.ArgumentParser(description='Generate NFTs for Mild Tangs')
+    parser = argparse.ArgumentParser(description='Run a vending machine for a specific NFT collection')
 
     price = parser.add_mutually_exclusive_group(required=True)
     price.add_argument('--mint-price', type=int, help='Price in LOVELACE that is being charged for each NFT (min 5₳)')
