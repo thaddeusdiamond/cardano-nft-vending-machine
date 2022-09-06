@@ -117,7 +117,8 @@ def get_parser():
     parser.add_argument('--metadata-dir', required=True, help='Local folder where Cardano NFT metadata (e.g., 721s) are stored')
     parser.add_argument('--output-dir', required=True, help='Local folder where vending machine output stored')
     parser.add_argument('--blockfrost-project', required=True, help='Blockfrost project ID to use for retrieving chain data')
-    parser.add_argument('--mainnet', action='store_true', help='Run the vending machine in production (default is testnet)')
+    parser.add_argument('--mainnet', action='store_true', help='Run the vending machine in production (default is False [preprod])')
+    parser.add_argument('--preview', action='store_true', help='Run the vending machine on the preview network (default is False [preprod])')
     parser.add_argument('--single-vend-max', type=int, required=True, help='Backend limit enforced on NFTs vended at once')
     parser.add_argument('--vend-randomly', action='store_true', help='Randomly pick from the metadata directory (using seed 321) when listing')
     parser.add_argument('--donation', action='store_true', help='Send a 1₳ donation per txn to the dev (no worries!)')
@@ -142,7 +143,7 @@ if __name__ == "__main__":
     _whitelist = get_whitelist_type(_args, os.path.join(_args.output_dir, WL_CONSUMED_DIR_SUBDIR))
     _mint = Mint(_args.mint_policy, _mint_price, _donation_amt, _args.metadata_dir, _args.mint_script, _args.mint_sign_key, _whitelist)
 
-    _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet)
+    _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet, preview=_args.preview)
 
     _blockfrost_protocol_params = _blockfrost_api.get_protocol_parameters()
     _protocol_params = rewritten_protocol_params(_blockfrost_protocol_params, _args.output_dir)
