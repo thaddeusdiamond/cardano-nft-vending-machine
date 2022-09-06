@@ -93,9 +93,14 @@ class NftVendingMachine(object):
             raise BadUtxoError(mint_req, f"Found too many/few lovelace balances for UTXO {mint_req}")
 
         lovelace_bal = lovelace_bals.pop()
-        num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price) if self.mint.price else 1
+        num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price) if self.mint.price else self.single_vend_max
         wl_availability = self.mint.whitelist.available(utxo_inputs)
         num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested, wl_availability)
+
+        if not self.mint.price and self.max_rebate > lovelace_bal.lovelace:
+            print(f"Payment of {lovelace_bal.lovelace} might cause minUTxO error for {num_mints} NFTs, refunding instead...")
+            num_mints = 0
+
         gross_profit = num_mints * self.mint.price
         change = lovelace_bal.lovelace - gross_profit
 
@@ -153,8 +158,8 @@ class NftVendingMachine(object):
         if self.payment_addr == self.profit_addr:
             raise ValueError(f"Payment address and profit address ({self.payment_addr}) cannot be the same!")
         self.mint.validate()
-        max_rebate = self.__max_rebate_for(self.mint.validated_names)
-        if self.mint.price and self.mint.price < max_rebate + self.mint.donation + Utxo.MIN_UTXO_VALUE:
+        self.max_rebate = self.__max_rebate_for(self.mint.validated_names)
+        if self.mint.price and self.mint.price < (self.max_rebate + self.mint.donation + Utxo.MIN_UTXO_VALUE):
             raise ValueError(f"Price of {self.mint.price} with donation of {self.mint.donation} could lead to a minUTxO error due to rebates")
         self.__is_validated = True
 

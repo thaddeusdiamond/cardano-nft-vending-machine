@@ -7,14 +7,15 @@ import time
 
 from test_utils.address import Address
 from test_utils.keys import KeyPair
-from test_utils.policy import Policy
-from test_utils.vending_machine import VendingMachineTestConfig
+from test_utils.policy import Policy, new_policy_for
+from test_utils.vending_machine import vm_test_config
 
+from test_utils.blockfrost import blockfrost_api, get_params_file, get_mainnet_env, get_network_magic
+from test_utils.config import get_funder_address
 from test_utils.chain import await_payment, burn_and_reclaim_tada, find_min_utxos_for_txn, lovelace_in, policy_is_empty, send_money
-from test_utils.fs import data_file_path, protocol_file_path, secrets_file_path
+from test_utils.fs import protocol_file_path
 from test_utils.metadata import asset_filename, asset_name_hex, create_asset_files, hex_to_asset_name, metadata_json
 
-from cardano.wt.blockfrost import BlockfrostApi
 from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.mint import Mint
 from cardano.wt.nft_vending_machine import NftVendingMachine
@@ -24,39 +25,8 @@ DONATION_AMT = 0
 EXPIRATION = 87654321
 MINT_PRICE = 10 * 1000000
 PADDING = 2 * 1000000
-VEND_RANDOMLY = True
 SINGLE_VEND_MAX = 30
-
-BLOCKFROST_RETRIES = 3
-MAINNET = os.getenv("TEST_ON_MAINNET", 'False').lower() in ('true', '1', 't')
-PREVIEW = os.getenv("TEST_ON_PREVIEW", 'False').lower() in ('true', '1', 't')
-
-def get_params_file():
-    return 'preview.json' if PREVIEW else 'preprod.json'
-
-def get_network_magic():
-    return BlockfrostApi.PREVIEW_MAGIC if PREVIEW else BlockfrostApi.PREPROD_MAGIC
-
-def get_funder_address(request):
-    secrets_dir = os.path.join(os.path.dirname(request.fspath), 'secrets')
-    return Address.existing(KeyPair.existing(secrets_dir, 'funder'), get_network_magic())
-
-def new_policy_for(policy_keys, policy_dir, script_name, expiration=EXPIRATION):
-    policy_keys = KeyPair.new(policy_dir, 'policy')
-    script_file_path = os.path.join(policy_dir, script_name)
-    return Policy.new(script_file_path, policy_keys.vkey_path, expiration)
-
-@pytest.fixture
-def vm_test_config():
-    return VendingMachineTestConfig()
-
-@pytest.fixture
-def blockfrost_api(request):
-    blockfrost_key = None
-    blockfrost_keyfile_path = 'blockfrost-preview.key' if PREVIEW else 'blockfrost-preprod.key'
-    with open(secrets_file_path(request, blockfrost_keyfile_path)) as blockfrost_keyfile:
-        blockfrost_key = blockfrost_keyfile.read().strip()
-    return BlockfrostApi(blockfrost_key, mainnet=MAINNET, preview=PREVIEW, max_get_retries=BLOCKFROST_RETRIES)
+VEND_RANDOMLY = True
 
 def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api):
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
@@ -95,7 +65,7 @@ def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api):
             mint,
             blockfrost_api,
             cardano_cli,
-            mainnet=MAINNET
+            mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
     nft_vending_machine.vend(
@@ -176,7 +146,7 @@ def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api):
             mint,
             blockfrost_api,
             cardano_cli,
-            mainnet=MAINNET
+            mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
     nft_vending_machine.vend(
@@ -271,7 +241,7 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api, expiration,
             mint,
             blockfrost_api,
             cardano_cli,
-            mainnet=MAINNET
+            mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
 
@@ -402,7 +372,7 @@ def test_mints_multiple_assets(request, vm_test_config, blockfrost_api):
             mint,
             blockfrost_api,
             cardano_cli,
-            mainnet=MAINNET
+            mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
 
@@ -541,7 +511,7 @@ def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api):
             mint,
             blockfrost_api,
             cardano_cli,
-            mainnet=MAINNET
+            mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
 
@@ -664,7 +634,7 @@ def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api):
             mint,
             blockfrost_api,
             cardano_cli,
-            mainnet=MAINNET
+            mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
 
@@ -771,7 +741,7 @@ def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api):
             mint,
             blockfrost_api,
             cardano_cli,
-            mainnet=MAINNET
+            mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
 
@@ -879,7 +849,7 @@ def test_can_handle_multiple_input_addresses(request, vm_test_config, blockfrost
             mint,
             blockfrost_api,
             cardano_cli,
-            mainnet=MAINNET
+            mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
 

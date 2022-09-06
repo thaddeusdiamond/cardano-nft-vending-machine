@@ -26,7 +26,7 @@ BLOCKFROST_PROTOCOL_TRANSLATOR = {
     'minUTxOValue': 'min_utxo',
     'monetaryExpansion': 'rho',
     'poolPledgeInfluence': 'a0',
-    'poolRetireMaxEpoch': 'e_max', 
+    'poolRetireMaxEpoch': 'e_max',
     'protocolVersion': {
         'minor': 'protocol_minor_ver',
         'major': 'protocol_major_ver'
@@ -106,7 +106,7 @@ def get_parser():
 
     price = parser.add_mutually_exclusive_group(required=True)
     price.add_argument('--mint-price', type=int, help='Price in LOVELACE that is being charged for each NFT (min 5₳)')
-    price.add_argument('--free-mint', action='store_true', help='Perform a free mint (user rebates all ADA')
+    price.add_argument('--free-mint', action='store_true', help='Perform a free mint (user gets a rebate of their ADA and receives "--single-vend-max")')
 
     parser.add_argument('--payment-addr', required=True, help='Cardano address where mint payments are sent to')
     parser.add_argument('--payment-sign-key', required=True, help='Location on disk of wallet signing keys for payment landing zone')
