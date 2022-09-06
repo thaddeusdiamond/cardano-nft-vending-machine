@@ -8,7 +8,6 @@ from test_utils.keys import KeyPair
 EXPIRATION = 87654321
 
 def new_policy_for(policy_keys, policy_dir, script_name, expiration=EXPIRATION):
-    policy_keys = KeyPair.new(policy_dir, 'policy')
     script_file_path = os.path.join(policy_dir, script_name)
     return Policy.new(script_file_path, policy_keys.vkey_path, expiration)
 
