@@ -30,12 +30,12 @@ def assets_are_empty(remaining_assets):
             return False
     return True
 
-def burn_and_reclaim_tada(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir):
+def burn_and_reclaim_tada(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, era='--alonzo-era'):
     burn_units = [f"{policy.id}{asset_name_hex(asset_name)}" for asset_name in asset_names]
     burn_names = '+'.join(['.'.join([f"-1 {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
-    return mint_assets_directly(burn_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, burned=burn_units)
+    return mint_assets_directly(burn_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, burned=burn_units, era=era)
 
-def calculate_remainder_str(lovelace_requested, num_receivers, utxo_inputs, burned):
+def calculate_remainder_str(lovelace_requested, num_receivers, utxo_inputs, burned, additional_outputs):
     total_qty = {}
     for utxo in utxo_inputs:
         for balance in utxo.balances:
@@ -45,6 +45,10 @@ def calculate_remainder_str(lovelace_requested, num_receivers, utxo_inputs, burn
     total_qty[Utxo.Balance.LOVELACE_POLICY] -= lovelace_requested * num_receivers
     for asset_name in burned:
         total_qty[asset_name] -= 1
+    for qty_asset_name in filter(None, additional_outputs.split('+')):
+        hex_asset_name = ''.join(qty_asset_name.split(' ')[1].split('.'))
+        if hex_asset_name in total_qty:
+            total_qty[hex_asset_name] -= 1
     units_qtys = []
     for (unit, qty) in total_qty.items():
         if qty:
@@ -61,7 +65,7 @@ def mint_assets(asset_names, policy, policy_keys, expiration, receiver, requeste
     mint_names = '+'.join(['.'.join([f"1 {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
     return mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs=mint_names)
 
-def mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs=None, burned=[]):
+def mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs='', burned=[], era='--alonzo-era'):
     mint_args = [
         f"--mint='{mint_names}'",
         f"--minting-script-file {policy.script_file_path}"
@@ -79,7 +83,8 @@ def mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, 
         additional_args=mint_args,
         additional_keys=[policy_keys],
         additional_outputs=outputs,
-        burned=burned
+        burned=burned,
+        era=era
     )
 
 def find_min_utxos_for_txn(requested, utxos, address):
@@ -110,11 +115,11 @@ def policy_is_empty(policy, blockfrost_api):
         time.sleep(BURN_WAIT)
     return False
 
-def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_keys=[], additional_outputs=None, ref_inputs=[], burned=[]):
+def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_keys=[], additional_outputs='', ref_inputs=[], burned=[], era='--alonzo-era'):
     txn_id = int(time.time())
     tx_in_args = [f"--tx-in {utxo.hash}#{utxo.ix}" for utxo in utxo_inputs]
-    remainder = calculate_remainder_str(requested, len(receivers), utxo_inputs, burned)
-    era = '--babbage-era' if ref_inputs else '--alonzo-era'
+    remainder = calculate_remainder_str(requested, len(receivers), utxo_inputs, burned, additional_outputs)
+    era = '--babbage-era' if ref_inputs else era
 
     tx_out_args = []
     for receiver in receivers:

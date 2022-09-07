@@ -88,6 +88,10 @@ class NftVendingMachine(object):
             raise BadUtxoError(mint_req, f"Txn hash {txn_hash} has no valid addresses ({utxo_inputs}), aborting...")
         input_addr = input_addrs.pop()
 
+        non_lovelace_bals = [balance for balance in mint_req.balances if balance.policy != Utxo.Balance.LOVELACE_POLICY]
+        if non_lovelace_bals:
+            raise BadUtxoError(mint_req, f"Cannot accept non-lovelace balances as payment")
+
         lovelace_bals = [balance for balance in mint_req.balances if balance.policy == Utxo.Balance.LOVELACE_POLICY]
         if len(lovelace_bals) != 1:
             raise BadUtxoError(mint_req, f"Found too many/few lovelace balances for UTXO {mint_req}")
