@@ -81,6 +81,20 @@ class BlockfrostApi(object):
             self.max_get_retries
         )
 
+    def __call_paginated_get_api(self, resource):
+        current_page = 0
+        while True:
+            current_page += 1
+            arr_data = []
+            try:
+                arr_data = self.__call_get_api(f"{resource}?count={BlockfrostApi._UTXO_LIST_LIMIT}&page={current_page}")
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code != HTTPStatus.NOT_FOUND:
+                    raise e
+            yield arr_data
+            if len(arr_data) < BlockfrostApi._UTXO_LIST_LIMIT:
+                return
+
     def __call_post_api(self, content_type, resource, data):
         return self.__call_with_retries(
             lambda: requests.post(f"{self.__get_api_base()}/{resource}", headers={'project_id': self.project, 'Content-Type': content_type}, data=data),
@@ -88,12 +102,10 @@ class BlockfrostApi(object):
         )
 
     def get_assets(self, policy_id):
-        try:
-            return self.__call_get_api(f"assets/policy/{policy_id}")
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == HTTPStatus.NOT_FOUND:
-                return []
-            raise e
+        assets = []
+        for assets_data in self.__call_paginated_get_api(f"assets/policy/{policy_id}"):
+            assets += assets_data
+        return assets
 
     def get_asset(self, asset_id):
         try:
@@ -117,15 +129,7 @@ class BlockfrostApi(object):
 
     def get_utxos(self, address, exclusions):
         available_utxos = set()
-        current_page = 0
-        while True:
-            current_page += 1
-            try:
-                utxo_data = self.__call_get_api(f"addresses/{address}/utxos?count={BlockfrostApi._UTXO_LIST_LIMIT}&page={current_page}")
-            except requests.exceptions.HTTPError as e:
-                if e.response.status_code == HTTPStatus.NOT_FOUND:
-                    return []
-                raise e
+        for utxo_data in self.__call_paginated_get_api(f"addresses/{address}/utxos"):
             #print('EXCLUSIONS\t', [f'{utxo.hash}#{utxo.ix}' for utxo in exclusions])
             for raw_utxo in utxo_data:
                 balances = [Utxo.Balance(int(balance['quantity']), balance['unit']) for balance in raw_utxo['amount']]
@@ -134,8 +138,6 @@ class BlockfrostApi(object):
                     print(f'Skipping {utxo.hash}#{utxo.ix}')
                     continue
                 available_utxos.add(utxo)
-            if len(utxo_data) < BlockfrostApi._UTXO_LIST_LIMIT:
-                break
         return available_utxos
 
     def get_protocol_parameters(self):
