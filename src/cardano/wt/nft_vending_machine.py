@@ -144,13 +144,12 @@ class NftVendingMachine(object):
             raise ValueError('Attempting to vend from non-validated vending machine')
         mint_reqs = self.blockfrost_api.get_utxos(self.payment_addr, exclusions)
         for mint_req in mint_reqs:
+            exclusions.add(mint_req)
             try:
                 self.__do_vend(mint_req, output_dir, locked_subdir, metadata_subdir)
-                exclusions.add(mint_req)
             except BadUtxoError as e:
                 print(f"UNRECOVERABLE UTXO ERROR\n{e.utxo}\n^--- REQUIRES INVESTIGATION")
                 print(traceback.format_exc())
-                exclusions.add(mint_req)
             except Exception as e:
                 print(f"WARNING: Uncaught exception for {mint_req}, not adding to exclusions (RETRY WILL BE ATTEMPTED)")
                 print(traceback.format_exc())
