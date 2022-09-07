@@ -61,7 +61,8 @@ def test_validate_requires_consumed_dir_created(request, vm_test_config):
     except ValueError as e:
         assert f"{vm_test_config.consumed_dir} does not exist" in str(e)
 
-def test_rejects_if_no_asset_sent_to_self(request, vm_test_config, blockfrost_api, cardano_cli):
+@pytest.mark.parametrize("WhitelistType", [SingleUseWhitelist, UnlimitedWhitelist])
+def test_rejects_if_no_asset_sent_to_self(request, vm_test_config, blockfrost_api, cardano_cli, WhitelistType):
     buyer = Address.new(
             vm_test_config.buyers_dir,
             'buyer',
@@ -93,7 +94,7 @@ def test_rejects_if_no_asset_sent_to_self(request, vm_test_config, blockfrost_ap
     wl_mint_utxo = await_payment(buyer.address, wl_txn, blockfrost_api)
 
     initialize_asset_wl(vm_test_config.whitelist_dir, vm_test_config.consumed_dir, wl_policy, request, blockfrost_api)
-    whitelist = SingleUseWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
+    whitelist = WhitelistType(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
     assert whitelist.is_whitelisted(wl_pass_onchain), f"{wl_pass_onchain} should be on the whitelist"
 
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
@@ -207,7 +208,8 @@ def test_rejects_if_no_asset_sent_to_self(request, vm_test_config, blockfrost_ap
     )
     await_payment(funder.address, drain_txn, blockfrost_api)
 
-def test_rejects_if_asset_sent_as_reference_input(request, vm_test_config, blockfrost_api, cardano_cli):
+@pytest.mark.parametrize("WhitelistType", [SingleUseWhitelist, UnlimitedWhitelist])
+def test_rejects_if_asset_sent_as_reference_input(request, vm_test_config, blockfrost_api, cardano_cli, WhitelistType):
     if not get_preview_env():
         pytest.skip('Must run this test against the Preview (Vasil) environment to use reference inputs')
 
@@ -242,7 +244,7 @@ def test_rejects_if_asset_sent_as_reference_input(request, vm_test_config, block
     wl_mint_utxo = await_payment(buyer.address, wl_txn, blockfrost_api)
 
     initialize_asset_wl(vm_test_config.whitelist_dir, vm_test_config.consumed_dir, wl_policy, request, blockfrost_api)
-    whitelist = SingleUseWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
+    whitelist = WhitelistType(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
     assert whitelist.is_whitelisted(wl_pass_onchain), f"{wl_pass_onchain} should be on the whitelist"
 
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
