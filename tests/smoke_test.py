@@ -26,6 +26,7 @@ MINT_PRICE = 10 * 1000000
 PADDING = 2 * 1000000
 SINGLE_VEND_MAX = 30
 VEND_RANDOMLY = True
+DONT_VEND_RANDOMLY = False
 
 MIN_UTXO_ON_REFUND = 1600000
 
@@ -250,9 +251,10 @@ def test_blacklists_min_utxo_errors(request, vm_test_config, blockfrost_api, car
 
     # Have to end the test here because there is no way to drain... ADA is locked
 
+@pytest.mark.parametrize("vend_randomly", [DONT_VEND_RANDOMLY, VEND_RANDOMLY])
 @pytest.mark.parametrize("expiration", [EXPIRATION, None])
 @pytest.mark.parametrize("asset_name", ['WildTangz 1', 'WildTangz Sw₳gbito'])
-def test_mints_single_asset(request, vm_test_config, blockfrost_api, cardano_cli, expiration, asset_name):
+def test_mints_single_asset(request, vm_test_config, blockfrost_api, cardano_cli, expiration, asset_name, vend_randomly):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
@@ -312,7 +314,7 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api, cardano_cli
             payment.address,
             payment.keypair.skey_path,
             profit.address,
-            VEND_RANDOMLY,
+            vend_randomly,
             SINGLE_VEND_MAX,
             mint,
             blockfrost_api,
