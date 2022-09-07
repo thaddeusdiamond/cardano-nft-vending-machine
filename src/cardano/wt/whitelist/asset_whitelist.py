@@ -43,10 +43,13 @@ class SingleUseWhitelist(AssetWhitelist):
         in the input are whitelisted and how many can be used.
 
         :param utxo_inputs: The UTXOs in the mint request's input transaction
+            NOTE: Explicitly skips reference inputs
         :return: Number of whitelisted assets found in input transaction
         """
         num_whitelisted = 0
         for utxo_input in utxo_inputs:
+            if utxo_input['reference']:
+                continue
             utxo_amounts = utxo_input['amount']
             for utxo_amount in utxo_amounts:
                 asset_id = utxo_amount['unit']
@@ -62,10 +65,13 @@ class SingleUseWhitelist(AssetWhitelist):
         debugging.
 
         :param utxo_inputs: The UTXOs in the mint request's input transaction
+            NOTE: Explicitly skips reference inputs
         :param num_mints: How many mints were successfully processed
         """
         remaining_to_remove = num_mints
         for utxo_input in utxo_inputs:
+            if utxo_input['reference']:
+                continue
             utxo_amounts = utxo_input['amount']
             for utxo_amount in utxo_amounts:
                 asset_id = utxo_amount['unit']
@@ -95,9 +101,12 @@ class UnlimitedWhitelist(AssetWhitelist):
         in the input are whitelisted and, if so, returns sys.maxsize.
 
         :param utxo_inputs: The UTXOs in the mint request's input transaction
+            NOTE: Explicitly skips reference inputs
         :return: sys.maxsize if a whitelisted asset is found, 0 otherwise
         """
         for utxo_input in utxo_inputs:
+            if utxo_input['reference']:
+                continue
             utxo_amounts = utxo_input['amount']
             for utxo_amount in utxo_amounts:
                 asset_id = utxo_amount['unit']

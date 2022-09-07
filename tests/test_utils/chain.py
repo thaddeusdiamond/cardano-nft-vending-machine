@@ -110,10 +110,11 @@ def policy_is_empty(policy, blockfrost_api):
         time.sleep(BURN_WAIT)
     return False
 
-def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_keys=[], additional_outputs=None, burned=[]):
+def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_keys=[], additional_outputs=None, ref_inputs=[], burned=[]):
     txn_id = int(time.time())
     tx_in_args = [f"--tx-in {utxo.hash}#{utxo.ix}" for utxo in utxo_inputs]
     remainder = calculate_remainder_str(requested, len(receivers), utxo_inputs, burned)
+    era = '--babbage-era' if ref_inputs else '--alonzo-era'
 
     tx_out_args = []
     for receiver in receivers:
@@ -123,6 +124,9 @@ def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfros
     if additional_outputs:
         tx_out_args[0] = f"--tx-out '{receivers[0].address}+{requested}+{additional_outputs}'"
 
+    additional_args_clone = additional_args.copy()
+    additional_args_clone += [f"--read-only-tx-in-reference {ref_input.hash}#{ref_input.ix}" for ref_input in ref_inputs]
+
     raw_build_file = cardano_cli.build_raw_txn(
         output_dir,
         txn_id,
@@ -130,7 +134,8 @@ def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfros
         tx_out_args,
         0,
         None,
-        additional_args
+        additional_args_clone,
+        era=era
     )
 
     signers = additional_keys
@@ -154,7 +159,8 @@ def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfros
         tx_out_args,
         min_fee,
         None,
-        additional_args
+        additional_args_clone,
+        era=era
     )
     signing_files = [keypair.skey_path for keypair in signers]
     signed_file = cardano_cli.sign_txn(signing_files, build_file)

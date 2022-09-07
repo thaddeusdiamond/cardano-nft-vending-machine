@@ -10,6 +10,7 @@ class NoWhitelist(object):
         Always return no limits (e.g., max integer)
 
         :param utxo_inputs: The UTXOs in the mint request's input transaction
+            NOTE: These may be reference inputs! Proceed with caution + validate
         :return: sys.maxsize (always)
         """
         return sys.maxsize
@@ -29,6 +30,7 @@ class NoWhitelist(object):
         No-operation because there is no whitelist to be consumed.
 
         :param utxo_inputs: The UTXOs in the mint request's input transaction
+            NOTE: These may be reference inputs! Proceed with caution + validate
         :param num_mints: How many mints were successfully processed
         """
         pass

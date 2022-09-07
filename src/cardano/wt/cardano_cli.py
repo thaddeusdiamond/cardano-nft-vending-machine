@@ -28,11 +28,11 @@ class CardanoCli(object):
     def named_asset_str(nft_policy, nft_names):
         return '+'.join(['.'.join([f"1 {nft_policy}", nft_name]) for nft_name in nft_names])
 
-    def build_raw_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, addl_args):
+    def build_raw_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, addl_args, era='--alonzo-era'):
         raw_build_file = os.path.join(output_dir, CardanoCli.TXN_DIR, f"txn_{txn_id}.raw.build")
         metadata_file_args = f"--metadata-json-file {metadata_json_file}" if metadata_json_file else ''
         self.__run_script(
-            f'transaction build-raw --fee {fee} --alonzo-era {" ".join(tx_out_args)} {" ".join(tx_in_args)} \
+            f'transaction build-raw --fee {fee} {era} {" ".join(tx_out_args)} {" ".join(tx_in_args)} \
                 {metadata_file_args} --out-file {raw_build_file} {" ".join(addl_args)}'
         )
         return raw_build_file
