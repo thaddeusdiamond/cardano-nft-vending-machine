@@ -10,13 +10,12 @@ from test_utils.keys import KeyPair
 from test_utils.policy import Policy, new_policy_for
 from test_utils.vending_machine import vm_test_config
 
-from test_utils.blockfrost import blockfrost_api, get_params_file, get_mainnet_env, get_network_magic
+from test_utils.blockfrost import blockfrost_api, get_mainnet_env, get_network_magic
 from test_utils.config import get_funder_address
-from test_utils.chain import await_payment, burn_and_reclaim_tada, find_min_utxos_for_txn, lovelace_in, policy_is_empty, send_money
+from test_utils.chain import await_payment, burn_and_reclaim_tada, cardano_cli, find_min_utxos_for_txn, lovelace_in, policy_is_empty, send_money
 from test_utils.fs import protocol_file_path
 from test_utils.metadata import asset_filename, asset_name_hex, create_asset_files, hex_to_asset_name, metadata_json
 
-from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.mint import Mint
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
@@ -30,7 +29,7 @@ VEND_RANDOMLY = True
 
 MIN_UTXO_ON_REFUND = 1600000
 
-def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api):
+def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api, cardano_cli):
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
 
@@ -42,9 +41,6 @@ def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api):
             policy.script_file_path,
             policy_keys.skey_path,
             NoWhitelist()
-    )
-    cardano_cli = CardanoCli(
-            protocol_params=protocol_file_path(request, get_params_file())
     )
 
     payment = Address.new(
@@ -80,16 +76,13 @@ def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api):
     created_assets = blockfrost_api.get_assets(policy.id)
     assert not created_assets, f"Somehow the test created assets under {policy.id}: {created_assets}"
 
-def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api):
+def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api, cardano_cli):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = MINT_PRICE + PADDING
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
-    cardano_cli = CardanoCli(
-            protocol_params=protocol_file_path(request, get_params_file())
-    )
     buyer = Address.new(
             vm_test_config.buyers_dir,
             'buyer',
@@ -173,16 +166,13 @@ def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api):
     )
     await_payment(funder.address, drain_txn, blockfrost_api)
 
-def test_blacklists_min_utxo_errors(request, vm_test_config, blockfrost_api):
+def test_blacklists_min_utxo_errors(request, vm_test_config, blockfrost_api, cardano_cli):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = MIN_UTXO_ON_REFUND
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
-    cardano_cli = CardanoCli(
-            protocol_params=protocol_file_path(request, get_params_file())
-    )
     buyer = Address.new(
             vm_test_config.buyers_dir,
             'buyer',
@@ -262,16 +252,13 @@ def test_blacklists_min_utxo_errors(request, vm_test_config, blockfrost_api):
 
 @pytest.mark.parametrize("expiration", [EXPIRATION, None])
 @pytest.mark.parametrize("asset_name", ['WildTangz 1', 'WildTangz Sw₳gbito'])
-def test_mints_single_asset(request, vm_test_config, blockfrost_api, expiration, asset_name):
+def test_mints_single_asset(request, vm_test_config, blockfrost_api, cardano_cli, expiration, asset_name):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = MINT_PRICE + PADDING
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
-    cardano_cli = CardanoCli(
-            protocol_params=protocol_file_path(request, get_params_file())
-    )
     buyer = Address.new(
             vm_test_config.buyers_dir,
             'buyer',
@@ -393,16 +380,13 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api, expiration,
 
     assert policy_is_empty(policy, blockfrost_api), f"Burned asset successfully but {policy.id} has remaining_assets"
 
-def test_mints_multiple_assets(request, vm_test_config, blockfrost_api):
+def test_mints_multiple_assets(request, vm_test_config, blockfrost_api, cardano_cli):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = MINT_PRICE * SINGLE_VEND_MAX + PADDING
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
-    cardano_cli = CardanoCli(
-            protocol_params=protocol_file_path(request, get_params_file())
-    )
     buyer = Address.new(
             vm_test_config.buyers_dir,
             'buyer',
@@ -532,16 +516,13 @@ def test_mints_multiple_assets(request, vm_test_config, blockfrost_api):
 
     assert policy_is_empty(policy, blockfrost_api), f"Burned asset successfully but {policy.id} has remaining_assets"
 
-def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api):
+def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api, cardano_cli):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = MINT_PRICE * (SINGLE_VEND_MAX + 1) + PADDING
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
-    cardano_cli = CardanoCli(
-            protocol_params=protocol_file_path(request, get_params_file())
-    )
     buyer = Address.new(
             vm_test_config.buyers_dir,
             'buyer',
@@ -655,16 +636,13 @@ def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api):
 
     assert policy_is_empty(policy, blockfrost_api), f"Burned asset successfully but {policy.id} has remaining_assets"
 
-def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api):
+def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api, cardano_cli):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = int(MINT_PRICE / 2)
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
-    cardano_cli = CardanoCli(
-            protocol_params=protocol_file_path(request, get_params_file())
-    )
     buyer = Address.new(
             vm_test_config.buyers_dir,
             'buyer',
@@ -762,16 +740,13 @@ def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api):
     )
     await_payment(funder.address, drain_txn, blockfrost_api)
 
-def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api):
+def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api, cardano_cli):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = MINT_PRICE * 2 + PADDING
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
-    cardano_cli = CardanoCli(
-            protocol_params=protocol_file_path(request, get_params_file())
-    )
     buyer = Address.new(
             vm_test_config.buyers_dir,
             'buyer',
@@ -863,16 +838,13 @@ def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api):
     )
     await_payment(funder.address, drain_txn, blockfrost_api)
 
-def test_can_handle_multiple_input_addresses(request, vm_test_config, blockfrost_api):
+def test_can_handle_multiple_input_addresses(request, vm_test_config, blockfrost_api, cardano_cli):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = int((MINT_PRICE + PADDING) / 2)
     funding_inputs = find_min_utxos_for_txn(funding_amt * 2, funding_utxos, funder.address)
 
-    cardano_cli = CardanoCli(
-            protocol_params=protocol_file_path(request, get_params_file())
-    )
     buyer_one = Address.new(
             vm_test_config.buyers_dir,
             'buyer1',

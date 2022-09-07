@@ -6,14 +6,13 @@ from test_utils.keys import KeyPair
 from test_utils.policy import Policy, new_policy_for
 from test_utils.vending_machine import vm_test_config
 
-from test_utils.blockfrost import blockfrost_api, get_params_file, get_mainnet_env, get_network_magic, get_preview_env
+from test_utils.blockfrost import blockfrost_api, get_mainnet_env, get_network_magic, get_preview_env
 from test_utils.config import get_funder_address
-from test_utils.chain import await_payment, burn_and_reclaim_tada, find_min_utxos_for_txn, lovelace_in, policy_is_empty, send_money
+from test_utils.chain import await_payment, burn_and_reclaim_tada, cardano_cli, find_min_utxos_for_txn, lovelace_in, policy_is_empty, send_money
 from test_utils.fs import protocol_file_path
 from test_utils.metadata import asset_filename, asset_name_hex, create_asset_files, hex_to_asset_name, metadata_json
 from test_utils.process import launch_py3_subprocess
 
-from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.mint import Mint
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
@@ -27,16 +26,13 @@ PADDING = 2000000
 
 PROC_WAIT_TIMEOUT = 60
 
-def test_cli_smoke(request, vm_test_config, blockfrost_api):
+def test_cli_smoke(request, vm_test_config, blockfrost_api, cardano_cli):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
     funding_amt = (MINT_PRICE * SINGLE_VEND_MAX) + PADDING
     funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
 
-    cardano_cli = CardanoCli(
-            protocol_params=protocol_file_path(request, get_params_file())
-    )
     buyer = Address.new(
             vm_test_config.buyers_dir,
             'buyer',

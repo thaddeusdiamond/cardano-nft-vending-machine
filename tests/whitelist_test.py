@@ -5,14 +5,13 @@ from test_utils.keys import KeyPair
 from test_utils.policy import Policy, new_policy_for
 from test_utils.vending_machine import vm_test_config
 
-from test_utils.blockfrost import blockfrost_api, get_params_file, get_mainnet_env, get_network_magic, get_preview_env
+from test_utils.blockfrost import blockfrost_api, get_mainnet_env, get_network_magic, get_preview_env
 from test_utils.config import get_funder_address
-from test_utils.chain import await_payment, burn_and_reclaim_tada, find_min_utxos_for_txn, lovelace_in, mint_assets, policy_is_empty, send_money
+from test_utils.chain import await_payment, burn_and_reclaim_tada, cardano_cli, find_min_utxos_for_txn, lovelace_in, mint_assets, policy_is_empty, send_money
 from test_utils.fs import data_file_path, protocol_file_path
 from test_utils.metadata import asset_filename, asset_name_hex, create_asset_files, hex_to_asset_name, metadata_json
 from test_utils.process import launch_py3_subprocess
 
-from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.mint import Mint
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.asset_whitelist import SingleUseWhitelist
@@ -61,10 +60,7 @@ def test_validate_requires_consumed_dir_created(request, vm_test_config):
     except ValueError as e:
         assert f"{vm_test_config.consumed_dir} does not exist" in str(e)
 
-def test_rejects_if_no_asset_sent_to_self(request, vm_test_config, blockfrost_api):
-    cardano_cli = CardanoCli(
-            protocol_params=protocol_file_path(request, get_params_file())
-    )
+def test_rejects_if_no_asset_sent_to_self(request, vm_test_config, blockfrost_api, cardano_cli):
     buyer = Address.new(
             vm_test_config.buyers_dir,
             'buyer',
@@ -210,10 +206,7 @@ def test_rejects_if_no_asset_sent_to_self(request, vm_test_config, blockfrost_ap
     )
     await_payment(funder.address, drain_txn, blockfrost_api)
 
-def test_mints_correct_number_for_single_use(request, vm_test_config, blockfrost_api):
-    cardano_cli = CardanoCli(
-            protocol_params=protocol_file_path(request, get_params_file())
-    )
+def test_mints_correct_number_for_single_use(request, vm_test_config, blockfrost_api, cardano_cli):
     buyer = Address.new(
             vm_test_config.buyers_dir,
             'buyer',

@@ -1,8 +1,11 @@
+import pytest
 import time
 
 from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.utxo import Utxo
 
+from test_utils.blockfrost import get_preview_env
+from test_utils.fs import protocol_file_path
 from test_utils.metadata import asset_name_hex
 
 BURN_RETRIES = 5
@@ -50,6 +53,9 @@ def calculate_remainder_str(lovelace_requested, num_receivers, utxo_inputs, burn
 
 def cardano_cli_name(unit):
     return f"{unit[0:56]}.{unit[56:]}" if unit != Utxo.Balance.LOVELACE_POLICY else ''
+
+def get_params_file():
+    return 'preview.json' if get_preview_env() else 'preprod.json'
 
 def mint_assets(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir):
     mint_names = '+'.join(['.'.join([f"1 {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
@@ -153,3 +159,7 @@ def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfros
     signing_files = [keypair.skey_path for keypair in signers]
     signed_file = cardano_cli.sign_txn(signing_files, build_file)
     return blockfrost_api.submit_txn(signed_file)
+
+@pytest.fixture
+def cardano_cli(request):
+    return CardanoCli(protocol_params=protocol_file_path(request, get_params_file()))

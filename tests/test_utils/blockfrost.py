@@ -13,9 +13,6 @@ def get_mainnet_env():
 def get_preview_env():
     return os.getenv("TEST_ON_PREVIEW", 'False').lower() in ('true', '1', 't')
 
-def get_params_file():
-    return 'preview.json' if get_preview_env() else 'preprod.json'
-
 def get_network_magic():
     return BlockfrostApi.PREVIEW_MAGIC if get_preview_env() else BlockfrostApi.PREPROD_MAGIC
 
