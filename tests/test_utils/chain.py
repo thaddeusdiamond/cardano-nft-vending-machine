@@ -14,9 +14,9 @@ BURN_WAIT = 30
 WAIT_RETRIES = 5
 WAIT_BACKOFF = 30
 
-def await_payment(address, tx_hash, blockfrost_api):
+def await_payment(address, tx_hash, blockfrost_api, exclusions=[]):
     for i in range(WAIT_RETRIES):
-        for utxo in blockfrost_api.get_utxos(address, []):
+        for utxo in blockfrost_api.get_utxos(address, exclusions):
             if not tx_hash or utxo.hash == tx_hash:
                 return utxo
         time.sleep(WAIT_BACKOFF)

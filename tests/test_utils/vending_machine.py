@@ -23,6 +23,7 @@ class VendingMachineTestConfig(object):
         self.policy_dir = self.__create_test_dir('policy')
         self.payees_dir = self.__create_test_dir('payees')
         self.txn_dir = self.__create_test_dir(CardanoCli.TXN_DIR)
+        self.txn_metadata_dir = self.__create_test_dir('in_proc')
 
         self.consumed_dir = os.path.join(self.root_dir, 'consumed')
         self.whitelist_dir = os.path.join(self.root_dir, 'whitelist')
