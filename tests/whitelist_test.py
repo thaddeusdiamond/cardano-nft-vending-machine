@@ -16,6 +16,7 @@ from test_utils.process import launch_py3_subprocess
 from cardano.wt.mint import Mint
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.asset_whitelist import SingleUseWhitelist, UnlimitedWhitelist
+from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
 DONATION_AMT = 0
 EXPIRATION = 87654321
@@ -60,6 +61,9 @@ def test_validate_requires_consumed_dir_created(request, vm_test_config):
         assert False, "Successfully validated mint without a whitelist directory"
     except ValueError as e:
         assert f"{vm_test_config.consumed_dir} does not exist" in str(e)
+
+def test_no_whitelist_always_whitelists():
+    assert NoWhitelist().is_whitelisted('foobar'), "NoWhitelist should always be whitelisted"
 
 @pytest.mark.parametrize("WhitelistType", [SingleUseWhitelist, UnlimitedWhitelist])
 def test_rejects_if_no_asset_sent_to_self(request, vm_test_config, blockfrost_api, cardano_cli, WhitelistType):
