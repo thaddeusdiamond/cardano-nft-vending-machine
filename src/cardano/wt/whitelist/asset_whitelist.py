@@ -70,6 +70,8 @@ class SingleUseWhitelist(AssetWhitelist):
         """
         remaining_to_remove = num_mints
         for utxo_input in utxo_inputs:
+            if not remaining_to_remove:
+                break
             if utxo_input['reference']:
                 continue
             utxo_amounts = utxo_input['amount']
@@ -79,11 +81,8 @@ class SingleUseWhitelist(AssetWhitelist):
                     continue
                 self._remove_from_whitelist(asset_id)
                 remaining_to_remove -= 1
-                if remaining_to_remove <= 0:
-                    return
-        # TODO: Test this by manually setting to -1 and seeing behavior?
-        if remaining_to_remove > 0:
-            raise ValueError(f"[MANUALLY DEBUG] THERE WAS AN OVERMINT FOR A WHITELIST, THE MINT WAS ALREADY PROCESSED, INVESTIGATE {utxo_inputs}")
+        if remaining_to_remove != 0:
+            raise ValueError(f"[MANUALLY DEBUG] THERE WAS AN OVERMINT FOR A WHITELIST ({remaining_to_remove}), THE MINT WAS ALREADY PROCESSED, INVESTIGATE {utxo_inputs}")
 
 
 """
