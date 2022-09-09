@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cardano-nft-vending-machine"
-version = "0.5.0-beta4"
+version = "0.5.0-beta5"
 
 description = "Library to perform NFT mints automatically on the Cardano blockchain"
 readme = "README.md"
