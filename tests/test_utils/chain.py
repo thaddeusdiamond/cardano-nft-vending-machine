@@ -30,10 +30,10 @@ def assets_are_empty(remaining_assets):
             return False
     return True
 
-def burn_and_reclaim_tada(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, era='--alonzo-era'):
+def burn_and_reclaim_tada(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, era='--alonzo-era', additional_keys=[]):
     burn_units = [f"{policy.id}{asset_name_hex(asset_name)}" for asset_name in asset_names]
     burn_names = '+'.join(['.'.join([f"-1 {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
-    return mint_assets_directly(burn_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, burned=burn_units, era=era)
+    return mint_assets_directly(burn_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, burned=burn_units, era=era, additional_keys=additional_keys)
 
 def calculate_remainder_str(lovelace_requested, num_receivers, utxo_inputs, burned, additional_outputs):
     total_qty = {}
@@ -65,13 +65,15 @@ def mint_assets(asset_names, policy, policy_keys, expiration, receiver, requeste
     mint_names = '+'.join(['.'.join([f"1 {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
     return mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs=mint_names)
 
-def mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs='', burned=[], era='--alonzo-era'):
-    mint_args = [
-        f"--mint='{mint_names}'",
-        f"--minting-script-file {policy.script_file_path}"
-    ]
-    if expiration:
-        mint_args.append(f"--invalid-hereafter {expiration}")
+def mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs='', burned=[], era='--alonzo-era', additional_keys=[]):
+    mint_args = []
+    if mint_names:
+        mint_args += [
+            f"--mint='{mint_names}'",
+            f"--minting-script-file {policy.script_file_path}"
+        ]
+        if expiration:
+            mint_args.append(f"--invalid-hereafter {expiration}")
     return send_money(
         [receiver],
         requested,
@@ -81,7 +83,7 @@ def mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, 
         blockfrost_api,
         output_dir,
         additional_args=mint_args,
-        additional_keys=[policy_keys],
+        additional_keys=[policy_keys] + additional_keys,
         additional_outputs=outputs,
         burned=burned,
         era=era
@@ -144,7 +146,8 @@ def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfros
     )
 
     signers = additional_keys.copy()
-    signers.append(sender.keypair)
+    if sender:
+        signers.append(sender.keypair)
 
     min_fee = cardano_cli.calculate_min_fee(
         raw_build_file,
