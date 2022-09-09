@@ -70,7 +70,7 @@ def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api, 
     nft_vending_machine.vend(
             vm_test_config.root_dir,
             vm_test_config.locked_dir,
-            vm_test_config.metadata_dir,
+            vm_test_config.txn_metadata_dir,
             []
     )
 
@@ -148,7 +148,7 @@ def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api, cardano_
     nft_vending_machine.vend(
             vm_test_config.root_dir,
             vm_test_config.locked_dir,
-            vm_test_config.metadata_dir,
+            vm_test_config.txn_metadata_dir,
             [payment_utxo]
     )
 
@@ -240,7 +240,7 @@ def test_blacklists_min_utxo_errors(request, vm_test_config, blockfrost_api, car
     nft_vending_machine.vend(
         vm_test_config.root_dir,
         vm_test_config.locked_dir,
-        vm_test_config.metadata_dir,
+        vm_test_config.txn_metadata_dir,
         exclusions
     )
 
@@ -328,7 +328,7 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api, cardano_cli
     nft_vending_machine.vend(
             vm_test_config.root_dir,
             vm_test_config.locked_dir,
-            vm_test_config.metadata_dir,
+            vm_test_config.txn_metadata_dir,
             set()
     )
 
@@ -457,7 +457,7 @@ def test_mints_multiple_assets(request, vm_test_config, blockfrost_api, cardano_
     nft_vending_machine.vend(
             vm_test_config.root_dir,
             vm_test_config.locked_dir,
-            vm_test_config.metadata_dir,
+            vm_test_config.txn_metadata_dir,
             set()
     )
     profit_utxo = await_payment(profit.address, None, blockfrost_api)
@@ -593,7 +593,7 @@ def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api, car
     nft_vending_machine.vend(
             vm_test_config.root_dir,
             vm_test_config.locked_dir,
-            vm_test_config.metadata_dir,
+            vm_test_config.txn_metadata_dir,
             set()
     )
     profit_utxo = await_payment(profit.address, None, blockfrost_api)
@@ -713,7 +713,7 @@ def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api, c
     nft_vending_machine.vend(
             vm_test_config.root_dir,
             vm_test_config.locked_dir,
-            vm_test_config.metadata_dir,
+            vm_test_config.txn_metadata_dir,
             set()
     )
 
@@ -814,7 +814,7 @@ def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api, ca
     nft_vending_machine.vend(
             vm_test_config.root_dir,
             vm_test_config.locked_dir,
-            vm_test_config.metadata_dir,
+            vm_test_config.txn_metadata_dir,
             set()
     )
 
@@ -922,7 +922,7 @@ def test_can_handle_multiple_input_addresses(request, vm_test_config, blockfrost
     nft_vending_machine.vend(
             vm_test_config.root_dir,
             vm_test_config.locked_dir,
-            vm_test_config.metadata_dir,
+            vm_test_config.txn_metadata_dir,
             set()
     )
 

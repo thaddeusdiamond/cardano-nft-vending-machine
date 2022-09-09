@@ -96,7 +96,7 @@ def test_donation_works(request, vm_test_config, blockfrost_api, cardano_cli):
     nft_vending_machine.vend(
             vm_test_config.root_dir,
             vm_test_config.locked_dir,
-            vm_test_config.metadata_dir,
+            vm_test_config.txn_metadata_dir,
             set()
     )
     profit_utxo = await_payment(profit.address, None, blockfrost_api)

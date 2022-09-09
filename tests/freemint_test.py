@@ -97,7 +97,7 @@ def test_returns_exactly_single_vend_max_with_rebate(request, vm_test_config, bl
     nft_vending_machine.vend(
             vm_test_config.root_dir,
             vm_test_config.locked_dir,
-            vm_test_config.metadata_dir,
+            vm_test_config.txn_metadata_dir,
             set()
     )
 
@@ -211,7 +211,7 @@ def test_returns_max_possible_if_rebate_too_small(request, vm_test_config, block
     nft_vending_machine.vend(
             vm_test_config.root_dir,
             vm_test_config.locked_dir,
-            vm_test_config.metadata_dir,
+            vm_test_config.txn_metadata_dir,
             set()
     )
 
