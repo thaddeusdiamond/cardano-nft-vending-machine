@@ -26,7 +26,8 @@ VEND_RANDOMLY = True
 WL_EXPIRATION = 76543210
 
 WL_REBATE = 5000000
-PADDING = 2000000
+PADDING = 500000
+MIN_UTXO_PAYMENT = 2000000
 
 def initialize_asset_wl(whitelist_dir, consumed_dir, wl_policy, request, blockfrost_api):
     wl_initializer_args = [
@@ -653,7 +654,7 @@ def test_mints_correct_number_for_single_use(request, vm_test_config, blockfrost
     )
     await_payment(funder.address, drain_txn, blockfrost_api)
 
-    burn_payment = lovelace_in(second_payment_utxo) - PADDING
+    burn_payment = lovelace_in(second_payment_utxo) - MIN_UTXO_PAYMENT
     burn_txn = burn_and_reclaim_tada(
             [asset_name],
             policy,
@@ -873,7 +874,7 @@ def test_mints_correct_number_for_multiple_passes(request, vm_test_config, block
     await_payment(funder.address, drain_txn, blockfrost_api)
 
     burn_assets = [hex_to_asset_name(created_asset['asset'][56:]) for created_asset in created_assets]
-    burn_payment = lovelace_in(second_payment_utxo) - PADDING
+    burn_payment = lovelace_in(second_payment_utxo) - MIN_UTXO_PAYMENT
     burn_txn = burn_and_reclaim_tada(
             burn_assets,
             policy,

@@ -134,10 +134,11 @@ class NftVendingMachine(object):
         else:
             change = change - fee
 
-        if change and (change < Utxo.MIN_UTXO_VALUE) or net_profit and (net_profit < Utxo.MIN_UTXO_VALUE):
+        final_change = user_rebate + change
+        if (final_change and (final_change < Utxo.MIN_UTXO_VALUE)) or (net_profit and (net_profit < Utxo.MIN_UTXO_VALUE)):
             raise BadUtxoError(mint_req, f"UTxO left change of {change}, and net_profit of {net_profit}, causing a minUTxO error")
 
-        tx_outs = self.__get_tx_out_args(input_addr, user_rebate + change, nft_names, net_profit, self.mint.donation)
+        tx_outs = self.__get_tx_out_args(input_addr, final_change, nft_names, net_profit, self.mint.donation)
         mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
         mint_signed = self.cardano_cli.sign_txn(signers, mint_build)
         self.blockfrost_api.submit_txn(mint_signed)

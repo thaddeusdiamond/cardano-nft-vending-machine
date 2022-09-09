@@ -19,7 +19,7 @@ MINT_PRICE = 10000000
 SINGLE_VEND_MAX = 10
 VEND_RANDOMLY = True
 
-PADDING = 2000000
+PADDING = 500000
 
 def test_donation_works(request, vm_test_config, blockfrost_api, cardano_cli):
     funder = get_funder_address(request)
