@@ -143,7 +143,7 @@ def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfros
         era=era
     )
 
-    signers = additional_keys
+    signers = additional_keys.copy()
     signers.append(sender.keypair)
 
     min_fee = cardano_cli.calculate_min_fee(
