@@ -617,8 +617,7 @@ def test_excludes_if_asset_sent_directly(request, vm_test_config, blockfrost_api
             [payment_utxo],
             cardano_cli,
             blockfrost_api,
-            vm_test_config.root_dir,
-            era='--babbage-era'
+            vm_test_config.root_dir
     )
     await_payment(funder.address, burn_txn, blockfrost_api)
 
