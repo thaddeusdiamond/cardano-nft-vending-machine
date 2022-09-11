@@ -65,10 +65,9 @@ cardano-cli transaction policyid \
 # Create a directory to place your NFT metadata in (each one stored in JSON)
 mkdir metadata/
 
-# NOTE: Here is where you move the JSONs representing your NFTs and save them
-cp $SET_YOUR_METADATA_DIRECTORY/* metadata/
-
 # In one terminal, now run the cardano-nft-vending-machine code (backend)
+# NOTE: We recommend running this before copying any metadata over to ensure
+#       that if your address leaked there are no mints before the drop is live
 git clone https://github.com/thaddeusdiamond/cardano-nft-vending-machine.git
 python3 -m venv venv
 venv/bin/pip3.8 install --upgrade pip
@@ -87,3 +86,7 @@ venv/bin/python3 cardano-nft-vending-machine/main.py \
   --single-vend-limit $SET_YOUR_SINGLE_VEND_MAX \
   --vend-randomly \
   --no-whitelist
+
+# In a second terminal, when you are ready copy your metadata files into the
+# vending machine and your drop will be live!
+cp $SET_YOUR_METADATA_DIRECTORY/* metadata/
