@@ -1,6 +1,7 @@
+
 <p align="center">
   <h1 align="center">cardano-nft-vending-machine</h1>
-  <p align="center">A simple CNFT mint-and-vend machine Python library that leverages ``cardano-cli``</p>
+  <p align="center">A simple CNFT mint-and-vend machine Python library that leverages cardano-cli and Blockfrost.io</p>
   <p align="center">
     <a href="https://github.com/thaddeusdiamond/cardano-nft-vending-machine">
       <img src="https://img.shields.io/github/commit-activity/m/thaddeusdiamond/cardano-vending-machine?style=for-the-badge" />
@@ -22,7 +23,7 @@
 Interactions on the Cardano blockchain involve **REAL CURRENCY AND SHOULD NOT BE TREATED LIGHTLY**.  Some principles:
 * Never send money to an address you don't know and can't validate
 * Keys should be stored on servers that have as little attack surface (e.g., [iptables blacklists](https://www.cyberciti.biz/tips/linux-iptables-4-block-all-incoming-traffic-but-allow-ssh.html)) as possible
-* Open source software should always be audited -- UTSL!
+* Open source software should always be audited independently -- UTSL!
 * There are **NO WARRANTIES WHATSOEVER WITH THIS PACKAGE** -- use at your own risk
 ## Quickstart
 This project contains Library bindings that can be installed using the standard [wheel](https://pypi.org/project/wheel/) mechanism.  See the [script quickstart section](#cardano_vending_machinepy) for how to run from CLI.
@@ -84,24 +85,61 @@ Building this project creates a ``.whl`` file for uploading to [PyPI]() or insta
 To enhance the output of tests, we recommend installing [pytest-clarity](https://pypi.org/project/pytest-clarity/):
 
 	pip3 install pytest-clarity
-Tests are stored in the ``tests`` subdirectory and are run using [pytest](https://docs.pytest.org/en/7.1.x/).  Before invoking the tests you will need to create files at ``tests/secrets/blockfrost-preprod.key`` and ``tests/secrets/blockfrost-preview.key`` with the respective network keys to make sure the test suite can access the test network blockchains (see [blockfrost.io docs](https://docs.blockfrost.io/) for more details).  Then, to invoke the tests:
+Tests are stored in the ``tests`` subdirectory and are run using [pytest](https://docs.pytest.org/en/7.1.x/).  But before invoking the tests you need to create secrets for [blockfrost.io](https://blockfrost.io) and fund a test address (the "funder") as below.
 
-	python3 -m pytest -vv
+### Blockfrost Key Files
+There are two supported test Cardano networks on Blockfrost as of the time of this writing: preprod and preview.  More information on these two supported test networks can be found on the [Cardano.org testnet documentation](https://docs.cardano.org/cardano-testnet/getting-started).
+
+For running the testing suite on preprod you will need to create a file at ``tests/secrets/blockfrost-preprod.key`` that contains *just your blockfrost key* for preprod. If you want to run on preview, simply do that same for your preview key at ``tests/secrets/blockfrost-preview.key``.  For more information, see the [full blockfrost.io documentation](https://docs.blockfrost.io/).
+
+### Funder Key Files
+The test suite assumes that there is a "funder" address that is able to pay tADA out (and then receive the entire sum at the end of a successful test less chain fees).  To create a new funder address, run:
+
+	cardano-cli address key-gen \
+		--signing-key-file tests/secrets/funder.skey \
+		--verification-key-file tests/secrets/funder.vkey
+
+The result will be two files (the signing key and verification/public key) of a "funder" address.  This address can be determined at the CLI using:
+
+	cardano-cli address build \
+            --payment-verification-key-file tests/secrets/funder.vkey \
+            --testnet-magic <PREPROD_OR_PREVIEW_MAGIC>
+
+Before running any tests ensure the funder has adequate tADA by using the [testnets faucet](https://docs.cardano.org/cardano-testnet/tools/faucet) for whichever test network you will be running the test suite against.
+
+### Running the Tests
+Finally, to run the tests:
+
+	python3 -m pytest -vv [-s] [-k TEST_SINGLE_PATTERN]
 By default tests will run on the [preprod Cardano network](https://docs.cardano.org/cardano-testnet/getting-started#late-stagetestingnetworks).  To test against mainnet or the [preview Cardano network](https://docs.cardano.org/cardano-testnet/getting-started#early-stagetestingnetworks) you can use the `TEST_ON_MAINNET` or `TEST_ON_PREVIEW` environment variables as follows:
 
 	TEST_ON_PREVIEW=true python3 -m pytest -vv
 Pull requests to ``master`` require 0 failing tests in order to be merged.
 
-## Code Coverage
+### Scale Testing
+The file `tests/scale_test.py` contains mechanisms for testing the vending machine at scale which are, by default, skipped during a test run.  To manually invoke these tests, you need to pass several specific parameters.  For example, running:
+
+	python3 -m pytest -vv -s -k test_concurrent_wallet_usage \
+		--available-assets 100
+		--max-nfts 4
+		--min-nfts 0
+		--mint-price 5000000
+		--num-wallets 100
+
+Would run a simulation where 100 wallets would randomly attempt to purchase between 0 and 4 assets (according to a normal distribution), during a 5A mint.  The code would ensure that each recipient received less than or equal to their stated asset count and that in total no more than 100 assets were minted.
+
+Note that currently we have only loaded 100 sample files into `tests/data/scale` but could increase this in the future as needed.  The key here is the concurrent wallet/UTxO creation, not necessarily the asset scale.  Whitelist scale testing is not supported at the moment.
+
+### Code Coverage
 We use [coverage](https://coverage.readthedocs.io/en/6.4.4/) to measure code coverage from our pytests across the code base.  To run a full test suite with code coverage metrics, invoke:
 
 	python3 -m coverage run --source=src/ --branch -m pytest -vv
 Note that you must *separately* generate the report on your CLI using the following:
 
 	python3 -m coverage html
-We aim to maintain 80% coverage (lines + branches) if possible.
+We aim to maintain 85%+ coverage (lines + branches) if possible.
 
 ## Documentation
 Documentation is stored in multi-line comments inside the source code and should be generated using the ``pdoc3`` package as follows:
 
-    pdoc3 --html -o docs/ src/cardano   
+    pdoc3 --html -o docs/ src/cardano
