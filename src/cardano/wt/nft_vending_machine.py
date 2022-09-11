@@ -83,6 +83,7 @@ class NftVendingMachine(object):
             random.shuffle(available_mints)
 
         utxo_inputs = self.blockfrost_api.get_inputs(mint_req.hash)
+        utxo_outputs = self.blockfrost_api.get_outputs(mint_req.hash)
         input_addrs = set([utxo_input['address'] for utxo_input in utxo_inputs])
         if len(input_addrs) < 1:
             raise BadUtxoError(mint_req, f"Txn hash {txn_hash} has no valid addresses ({utxo_inputs}), aborting...")
@@ -98,7 +99,7 @@ class NftVendingMachine(object):
 
         lovelace_bal = lovelace_bals.pop()
         num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price) if self.mint.price else self.single_vend_max
-        wl_availability = self.mint.whitelist.available(utxo_inputs)
+        wl_availability = self.mint.whitelist.available(utxo_outputs)
         num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested, wl_availability)
 
         if not self.mint.price and self.max_rebate > lovelace_bal.lovelace:
@@ -142,7 +143,7 @@ class NftVendingMachine(object):
         mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
         mint_signed = self.cardano_cli.sign_txn(signers, mint_build)
         self.blockfrost_api.submit_txn(mint_signed)
-        self.mint.whitelist.consume(utxo_inputs, num_mints)
+        self.mint.whitelist.consume(utxo_outputs, num_mints)
 
     def vend(self, output_dir, locked_subdir, metadata_subdir, exclusions):
         if not self.__is_validated:

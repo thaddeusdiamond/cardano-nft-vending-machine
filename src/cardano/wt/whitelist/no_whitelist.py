@@ -5,11 +5,11 @@ Representation of a non-existent whitelist (e.g., no mint restrictions).
 """
 class NoWhitelist(object):
 
-    def available(self, utxo_inputs):
+    def available(self, utxo_outputs):
         """
         Always return no limits (e.g., max integer)
 
-        :param utxo_inputs: The UTXOs in the mint request's input transaction
+        :param utxo_outputs: The UTXOs in the mint request's input transaction
             NOTE: These may be reference inputs! Proceed with caution + validate
         :return: sys.maxsize (always)
         """
@@ -25,11 +25,11 @@ class NoWhitelist(object):
         """
         return True
 
-    def consume(self, utxo_inputs, num_mints):
+    def consume(self, utxo_outputs, num_mints):
         """
         No-operation because there is no whitelist to be consumed.
 
-        :param utxo_inputs: The UTXOs in the mint request's input transaction
+        :param utxo_outputs: The UTXOs in the mint request's input transaction
             NOTE: These may be reference inputs! Proceed with caution + validate
         :param num_mints: How many mints were successfully processed
         """

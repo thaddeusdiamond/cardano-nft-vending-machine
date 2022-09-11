@@ -119,6 +119,10 @@ class BlockfrostApi(object):
         utxo_metadata = self.__call_get_api(f"txs/{txn_hash}/utxos")
         return utxo_metadata['inputs']
 
+    def get_outputs(self, txn_hash):
+        utxo_metadata = self.__call_get_api(f"txs/{txn_hash}/utxos")
+        return utxo_metadata['outputs']
+
     def get_txn(self, txn_hash):
         try:
             return self.__call_get_api(f"txs/{txn_hash}")
