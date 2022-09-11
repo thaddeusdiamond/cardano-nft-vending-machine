@@ -26,29 +26,155 @@
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">import requests
+<pre><code class="python">import json
+import requests
+import time
+
+from http import HTTPStatus
+
+from cardano.wt.utxo import Utxo
 
 &#34;&#34;&#34;
 Repreentation of the Blockfrost web API used in retrieving metadata about txn i/o on the chain.
 &#34;&#34;&#34;
 class BlockfrostApi(object):
-    def __init__(self, project, mainnet=False):
+
+    PREPROD_MAGIC = &#39;1&#39;
+    PREVIEW_MAGIC = &#39;2&#39;
+
+    _API_CALLS_PER_SEC = 10
+    _APPLICATION_JSON = &#39;application/json&#39;
+    _BACKOFF_SEC = 10
+    _BURST_TXN_PER_SEC = 10
+    _MAX_GET_RETRIES = 9
+    _MAX_POST_RETRIES = 3
+    _MAX_BURST = 500
+    _UTXO_LIST_LIMIT = 100
+
+    def __init__(self, project, mainnet=False, preview=False, max_get_retries=_MAX_GET_RETRIES, max_post_retries=_MAX_POST_RETRIES):
         self.project = project
         self.mainnet = mainnet
+        self.preview = preview
+        self.built_up_burst = BlockfrostApi._MAX_BURST
+        self.bursting = False
+        self.curr_sec = int(time.time())
+        self.curr_calls = 0
+        self.max_get_retries = max_get_retries
+        self.max_post_retries = max_post_retries
+
+    def __account_for_rate_limit(self):
+        this_time = time.time()
+        this_sec = int(this_time)
+        if self.curr_sec == this_sec:
+            self.curr_calls += 1
+        else:
+            if self.bursting:
+                self.built_up_burst = 0
+            else:
+                self.built_up_burst = min(BlockfrostApi._MAX_BURST, self.built_up_burst + BlockfrostApi._BURST_TXN_PER_SEC)
+            self.bursting = False
+            self.curr_sec = this_sec
+            self.curr_calls = 1
+        if self.curr_calls == BlockfrostApi._API_CALLS_PER_SEC:
+            print(&#34;Blockfrost API: ENTERING BURST, EXCEEDED ALLOWABLE API CALLS&#34;)
+            self.bursting = True
+        if self.bursting and (self.curr_calls &gt; self.built_up_burst):
+            print(&#34;Blockfrost API: BEYOND BURST CAPABILITIES, MAY RESULT IN FATAL ERROR&#34;)
+            time.sleep(1.0  / BlockfrostApi._API_CALLS_PER_SEC)
 
     def __get_api_base(self):
-        return f&#34;https://cardano-{&#39;mainnet&#39; if self.mainnet else &#39;testnet&#39;}.blockfrost.io/api/v0&#34;
+        identifier = &#39;mainnet&#39; if self.mainnet else &#39;preview&#39; if self.preview else &#39;preprod&#39;
+        return f&#34;https://cardano-{identifier}.blockfrost.io/api/v0&#34;
 
-    def __call_api(self, resource):
-        return requests.get(f&#34;{self.__get_api_base()}/{resource}&#34;, headers={&#39;project_id&#39;: self.project})
+    def __call_with_retries(self, call_func, max_retries):
+        self.__account_for_rate_limit()
+        retries = 0
+        while True:
+            try:
+                api_resp = call_func()
+                print(f&#34;{api_resp.url}: ({api_resp.status_code})&#34;)
+                print(api_resp.text)
+                api_resp.raise_for_status()
+                return api_resp.json()
+            except requests.exceptions.HTTPError as e:
+                if retries &lt; max_retries:
+                    retries += 1
+                    time.sleep(retries * BlockfrostApi._BACKOFF_SEC)
+                else:
+                    raise e
 
-    def get_input_address(self, txn_hash):
-        utxo_metadata = self.__call_api(f&#34;txs/{txn_hash}/utxos&#34;).json()
-        print(utxo_metadata)
-        utxo_inputs = set([utxo_input[&#39;address&#39;] for utxo_input in utxo_metadata[&#39;inputs&#39;]])
-        if len(utxo_inputs) != 1:
-            raise ValueError(f&#34;Txn hash {txn_hash} came from != 1 addresses({utxo_inputs}), aborting...&#34;)
-        return utxo_inputs.pop()</code></pre>
+    def __call_get_api(self, resource):
+        return self.__call_with_retries(
+            lambda: requests.get(f&#34;{self.__get_api_base()}/{resource}&#34;, headers={&#39;project_id&#39;: self.project, &#39;Content-Type&#39;: BlockfrostApi._APPLICATION_JSON}),
+            self.max_get_retries
+        )
+
+    def __call_paginated_get_api(self, resource):
+        current_page = 0
+        while True:
+            current_page += 1
+            arr_data = []
+            try:
+                arr_data = self.__call_get_api(f&#34;{resource}?count={BlockfrostApi._UTXO_LIST_LIMIT}&amp;page={current_page}&#34;)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code != HTTPStatus.NOT_FOUND:
+                    raise e
+            yield arr_data
+            if len(arr_data) &lt; BlockfrostApi._UTXO_LIST_LIMIT:
+                return
+
+    def __call_post_api(self, content_type, resource, data):
+        return self.__call_with_retries(
+            lambda: requests.post(f&#34;{self.__get_api_base()}/{resource}&#34;, headers={&#39;project_id&#39;: self.project, &#39;Content-Type&#39;: content_type}, data=data),
+            self.max_post_retries
+        )
+
+    def get_assets(self, policy_id):
+        assets = []
+        for assets_data in self.__call_paginated_get_api(f&#34;assets/policy/{policy_id}&#34;):
+            assets += assets_data
+        return assets
+
+    def get_asset(self, asset_id):
+        try:
+            return self.__call_get_api(f&#34;assets/{asset_id}&#34;)
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == HTTPStatus.NOT_FOUND:
+                return None
+            raise e
+
+    def get_inputs(self, txn_hash):
+        utxo_metadata = self.__call_get_api(f&#34;txs/{txn_hash}/utxos&#34;)
+        return utxo_metadata[&#39;inputs&#39;]
+
+    def get_txn(self, txn_hash):
+        try:
+            return self.__call_get_api(f&#34;txs/{txn_hash}&#34;)
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == HTTPStatus.NOT_FOUND:
+                return None
+            raise e
+
+    def get_utxos(self, address, exclusions):
+        available_utxos = set()
+        for utxo_data in self.__call_paginated_get_api(f&#34;addresses/{address}/utxos&#34;):
+            #print(&#39;EXCLUSIONS\t&#39;, [f&#39;{utxo.hash}#{utxo.ix}&#39; for utxo in exclusions])
+            for raw_utxo in utxo_data:
+                balances = [Utxo.Balance(int(balance[&#39;quantity&#39;]), balance[&#39;unit&#39;]) for balance in raw_utxo[&#39;amount&#39;]]
+                utxo = Utxo(raw_utxo[&#39;tx_hash&#39;], raw_utxo[&#39;output_index&#39;], balances)
+                if utxo in exclusions:
+                    print(f&#39;Skipping {utxo.hash}#{utxo.ix}&#39;)
+                    continue
+                available_utxos.add(utxo)
+        return available_utxos
+
+    def get_protocol_parameters(self):
+        return self.__call_get_api(&#39;epochs/latest/parameters&#39;)
+
+    def submit_txn(self, signed_file):
+        with open(signed_file, &#39;r&#39;) as signed_filehandle:
+            tx_cbor = json.load(signed_filehandle)[&#39;cborHex&#39;]
+        return self.__call_post_api(&#39;application/cbor&#39;, &#39;/tx/submit&#39;, bytes.fromhex(tx_cbor))</code></pre>
 </details>
 </section>
 <section>
@@ -62,7 +188,7 @@ class BlockfrostApi(object):
 <dl>
 <dt id="cardano.wt.blockfrost.BlockfrostApi"><code class="flex name class">
 <span>class <span class="ident">BlockfrostApi</span></span>
-<span>(</span><span>project, mainnet=False)</span>
+<span>(</span><span>project, mainnet=False, preview=False, max_get_retries=9, max_post_retries=3)</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -71,28 +197,159 @@ class BlockfrostApi(object):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class BlockfrostApi(object):
-    def __init__(self, project, mainnet=False):
+
+    PREPROD_MAGIC = &#39;1&#39;
+    PREVIEW_MAGIC = &#39;2&#39;
+
+    _API_CALLS_PER_SEC = 10
+    _APPLICATION_JSON = &#39;application/json&#39;
+    _BACKOFF_SEC = 10
+    _BURST_TXN_PER_SEC = 10
+    _MAX_GET_RETRIES = 9
+    _MAX_POST_RETRIES = 3
+    _MAX_BURST = 500
+    _UTXO_LIST_LIMIT = 100
+
+    def __init__(self, project, mainnet=False, preview=False, max_get_retries=_MAX_GET_RETRIES, max_post_retries=_MAX_POST_RETRIES):
         self.project = project
         self.mainnet = mainnet
+        self.preview = preview
+        self.built_up_burst = BlockfrostApi._MAX_BURST
+        self.bursting = False
+        self.curr_sec = int(time.time())
+        self.curr_calls = 0
+        self.max_get_retries = max_get_retries
+        self.max_post_retries = max_post_retries
+
+    def __account_for_rate_limit(self):
+        this_time = time.time()
+        this_sec = int(this_time)
+        if self.curr_sec == this_sec:
+            self.curr_calls += 1
+        else:
+            if self.bursting:
+                self.built_up_burst = 0
+            else:
+                self.built_up_burst = min(BlockfrostApi._MAX_BURST, self.built_up_burst + BlockfrostApi._BURST_TXN_PER_SEC)
+            self.bursting = False
+            self.curr_sec = this_sec
+            self.curr_calls = 1
+        if self.curr_calls == BlockfrostApi._API_CALLS_PER_SEC:
+            print(&#34;Blockfrost API: ENTERING BURST, EXCEEDED ALLOWABLE API CALLS&#34;)
+            self.bursting = True
+        if self.bursting and (self.curr_calls &gt; self.built_up_burst):
+            print(&#34;Blockfrost API: BEYOND BURST CAPABILITIES, MAY RESULT IN FATAL ERROR&#34;)
+            time.sleep(1.0  / BlockfrostApi._API_CALLS_PER_SEC)
 
     def __get_api_base(self):
-        return f&#34;https://cardano-{&#39;mainnet&#39; if self.mainnet else &#39;testnet&#39;}.blockfrost.io/api/v0&#34;
+        identifier = &#39;mainnet&#39; if self.mainnet else &#39;preview&#39; if self.preview else &#39;preprod&#39;
+        return f&#34;https://cardano-{identifier}.blockfrost.io/api/v0&#34;
 
-    def __call_api(self, resource):
-        return requests.get(f&#34;{self.__get_api_base()}/{resource}&#34;, headers={&#39;project_id&#39;: self.project})
+    def __call_with_retries(self, call_func, max_retries):
+        self.__account_for_rate_limit()
+        retries = 0
+        while True:
+            try:
+                api_resp = call_func()
+                print(f&#34;{api_resp.url}: ({api_resp.status_code})&#34;)
+                print(api_resp.text)
+                api_resp.raise_for_status()
+                return api_resp.json()
+            except requests.exceptions.HTTPError as e:
+                if retries &lt; max_retries:
+                    retries += 1
+                    time.sleep(retries * BlockfrostApi._BACKOFF_SEC)
+                else:
+                    raise e
 
-    def get_input_address(self, txn_hash):
-        utxo_metadata = self.__call_api(f&#34;txs/{txn_hash}/utxos&#34;).json()
-        print(utxo_metadata)
-        utxo_inputs = set([utxo_input[&#39;address&#39;] for utxo_input in utxo_metadata[&#39;inputs&#39;]])
-        if len(utxo_inputs) != 1:
-            raise ValueError(f&#34;Txn hash {txn_hash} came from != 1 addresses({utxo_inputs}), aborting...&#34;)
-        return utxo_inputs.pop()</code></pre>
+    def __call_get_api(self, resource):
+        return self.__call_with_retries(
+            lambda: requests.get(f&#34;{self.__get_api_base()}/{resource}&#34;, headers={&#39;project_id&#39;: self.project, &#39;Content-Type&#39;: BlockfrostApi._APPLICATION_JSON}),
+            self.max_get_retries
+        )
+
+    def __call_paginated_get_api(self, resource):
+        current_page = 0
+        while True:
+            current_page += 1
+            arr_data = []
+            try:
+                arr_data = self.__call_get_api(f&#34;{resource}?count={BlockfrostApi._UTXO_LIST_LIMIT}&amp;page={current_page}&#34;)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code != HTTPStatus.NOT_FOUND:
+                    raise e
+            yield arr_data
+            if len(arr_data) &lt; BlockfrostApi._UTXO_LIST_LIMIT:
+                return
+
+    def __call_post_api(self, content_type, resource, data):
+        return self.__call_with_retries(
+            lambda: requests.post(f&#34;{self.__get_api_base()}/{resource}&#34;, headers={&#39;project_id&#39;: self.project, &#39;Content-Type&#39;: content_type}, data=data),
+            self.max_post_retries
+        )
+
+    def get_assets(self, policy_id):
+        assets = []
+        for assets_data in self.__call_paginated_get_api(f&#34;assets/policy/{policy_id}&#34;):
+            assets += assets_data
+        return assets
+
+    def get_asset(self, asset_id):
+        try:
+            return self.__call_get_api(f&#34;assets/{asset_id}&#34;)
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == HTTPStatus.NOT_FOUND:
+                return None
+            raise e
+
+    def get_inputs(self, txn_hash):
+        utxo_metadata = self.__call_get_api(f&#34;txs/{txn_hash}/utxos&#34;)
+        return utxo_metadata[&#39;inputs&#39;]
+
+    def get_txn(self, txn_hash):
+        try:
+            return self.__call_get_api(f&#34;txs/{txn_hash}&#34;)
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == HTTPStatus.NOT_FOUND:
+                return None
+            raise e
+
+    def get_utxos(self, address, exclusions):
+        available_utxos = set()
+        for utxo_data in self.__call_paginated_get_api(f&#34;addresses/{address}/utxos&#34;):
+            #print(&#39;EXCLUSIONS\t&#39;, [f&#39;{utxo.hash}#{utxo.ix}&#39; for utxo in exclusions])
+            for raw_utxo in utxo_data:
+                balances = [Utxo.Balance(int(balance[&#39;quantity&#39;]), balance[&#39;unit&#39;]) for balance in raw_utxo[&#39;amount&#39;]]
+                utxo = Utxo(raw_utxo[&#39;tx_hash&#39;], raw_utxo[&#39;output_index&#39;], balances)
+                if utxo in exclusions:
+                    print(f&#39;Skipping {utxo.hash}#{utxo.ix}&#39;)
+                    continue
+                available_utxos.add(utxo)
+        return available_utxos
+
+    def get_protocol_parameters(self):
+        return self.__call_get_api(&#39;epochs/latest/parameters&#39;)
+
+    def submit_txn(self, signed_file):
+        with open(signed_file, &#39;r&#39;) as signed_filehandle:
+            tx_cbor = json.load(signed_filehandle)[&#39;cborHex&#39;]
+        return self.__call_post_api(&#39;application/cbor&#39;, &#39;/tx/submit&#39;, bytes.fromhex(tx_cbor))</code></pre>
 </details>
+<h3>Class variables</h3>
+<dl>
+<dt id="cardano.wt.blockfrost.BlockfrostApi.PREPROD_MAGIC"><code class="name">var <span class="ident">PREPROD_MAGIC</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="cardano.wt.blockfrost.BlockfrostApi.PREVIEW_MAGIC"><code class="name">var <span class="ident">PREVIEW_MAGIC</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
 <h3>Methods</h3>
 <dl>
-<dt id="cardano.wt.blockfrost.BlockfrostApi.get_input_address"><code class="name flex">
-<span>def <span class="ident">get_input_address</span></span>(<span>self, txn_hash)</span>
+<dt id="cardano.wt.blockfrost.BlockfrostApi.get_asset"><code class="name flex">
+<span>def <span class="ident">get_asset</span></span>(<span>self, asset_id)</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -100,13 +357,112 @@ class BlockfrostApi(object):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_input_address(self, txn_hash):
-    utxo_metadata = self.__call_api(f&#34;txs/{txn_hash}/utxos&#34;).json()
-    print(utxo_metadata)
-    utxo_inputs = set([utxo_input[&#39;address&#39;] for utxo_input in utxo_metadata[&#39;inputs&#39;]])
-    if len(utxo_inputs) != 1:
-        raise ValueError(f&#34;Txn hash {txn_hash} came from != 1 addresses({utxo_inputs}), aborting...&#34;)
-    return utxo_inputs.pop()</code></pre>
+<pre><code class="python">def get_asset(self, asset_id):
+    try:
+        return self.__call_get_api(f&#34;assets/{asset_id}&#34;)
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == HTTPStatus.NOT_FOUND:
+            return None
+        raise e</code></pre>
+</details>
+</dd>
+<dt id="cardano.wt.blockfrost.BlockfrostApi.get_assets"><code class="name flex">
+<span>def <span class="ident">get_assets</span></span>(<span>self, policy_id)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_assets(self, policy_id):
+    assets = []
+    for assets_data in self.__call_paginated_get_api(f&#34;assets/policy/{policy_id}&#34;):
+        assets += assets_data
+    return assets</code></pre>
+</details>
+</dd>
+<dt id="cardano.wt.blockfrost.BlockfrostApi.get_inputs"><code class="name flex">
+<span>def <span class="ident">get_inputs</span></span>(<span>self, txn_hash)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_inputs(self, txn_hash):
+    utxo_metadata = self.__call_get_api(f&#34;txs/{txn_hash}/utxos&#34;)
+    return utxo_metadata[&#39;inputs&#39;]</code></pre>
+</details>
+</dd>
+<dt id="cardano.wt.blockfrost.BlockfrostApi.get_protocol_parameters"><code class="name flex">
+<span>def <span class="ident">get_protocol_parameters</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_protocol_parameters(self):
+    return self.__call_get_api(&#39;epochs/latest/parameters&#39;)</code></pre>
+</details>
+</dd>
+<dt id="cardano.wt.blockfrost.BlockfrostApi.get_txn"><code class="name flex">
+<span>def <span class="ident">get_txn</span></span>(<span>self, txn_hash)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_txn(self, txn_hash):
+    try:
+        return self.__call_get_api(f&#34;txs/{txn_hash}&#34;)
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == HTTPStatus.NOT_FOUND:
+            return None
+        raise e</code></pre>
+</details>
+</dd>
+<dt id="cardano.wt.blockfrost.BlockfrostApi.get_utxos"><code class="name flex">
+<span>def <span class="ident">get_utxos</span></span>(<span>self, address, exclusions)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_utxos(self, address, exclusions):
+    available_utxos = set()
+    for utxo_data in self.__call_paginated_get_api(f&#34;addresses/{address}/utxos&#34;):
+        #print(&#39;EXCLUSIONS\t&#39;, [f&#39;{utxo.hash}#{utxo.ix}&#39; for utxo in exclusions])
+        for raw_utxo in utxo_data:
+            balances = [Utxo.Balance(int(balance[&#39;quantity&#39;]), balance[&#39;unit&#39;]) for balance in raw_utxo[&#39;amount&#39;]]
+            utxo = Utxo(raw_utxo[&#39;tx_hash&#39;], raw_utxo[&#39;output_index&#39;], balances)
+            if utxo in exclusions:
+                print(f&#39;Skipping {utxo.hash}#{utxo.ix}&#39;)
+                continue
+            available_utxos.add(utxo)
+    return available_utxos</code></pre>
+</details>
+</dd>
+<dt id="cardano.wt.blockfrost.BlockfrostApi.submit_txn"><code class="name flex">
+<span>def <span class="ident">submit_txn</span></span>(<span>self, signed_file)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def submit_txn(self, signed_file):
+    with open(signed_file, &#39;r&#39;) as signed_filehandle:
+        tx_cbor = json.load(signed_filehandle)[&#39;cborHex&#39;]
+    return self.__call_post_api(&#39;application/cbor&#39;, &#39;/tx/submit&#39;, bytes.fromhex(tx_cbor))</code></pre>
 </details>
 </dd>
 </dl>
@@ -130,7 +486,15 @@ class BlockfrostApi(object):
 <li>
 <h4><code><a title="cardano.wt.blockfrost.BlockfrostApi" href="#cardano.wt.blockfrost.BlockfrostApi">BlockfrostApi</a></code></h4>
 <ul class="">
-<li><code><a title="cardano.wt.blockfrost.BlockfrostApi.get_input_address" href="#cardano.wt.blockfrost.BlockfrostApi.get_input_address">get_input_address</a></code></li>
+<li><code><a title="cardano.wt.blockfrost.BlockfrostApi.PREPROD_MAGIC" href="#cardano.wt.blockfrost.BlockfrostApi.PREPROD_MAGIC">PREPROD_MAGIC</a></code></li>
+<li><code><a title="cardano.wt.blockfrost.BlockfrostApi.PREVIEW_MAGIC" href="#cardano.wt.blockfrost.BlockfrostApi.PREVIEW_MAGIC">PREVIEW_MAGIC</a></code></li>
+<li><code><a title="cardano.wt.blockfrost.BlockfrostApi.get_asset" href="#cardano.wt.blockfrost.BlockfrostApi.get_asset">get_asset</a></code></li>
+<li><code><a title="cardano.wt.blockfrost.BlockfrostApi.get_assets" href="#cardano.wt.blockfrost.BlockfrostApi.get_assets">get_assets</a></code></li>
+<li><code><a title="cardano.wt.blockfrost.BlockfrostApi.get_inputs" href="#cardano.wt.blockfrost.BlockfrostApi.get_inputs">get_inputs</a></code></li>
+<li><code><a title="cardano.wt.blockfrost.BlockfrostApi.get_protocol_parameters" href="#cardano.wt.blockfrost.BlockfrostApi.get_protocol_parameters">get_protocol_parameters</a></code></li>
+<li><code><a title="cardano.wt.blockfrost.BlockfrostApi.get_txn" href="#cardano.wt.blockfrost.BlockfrostApi.get_txn">get_txn</a></code></li>
+<li><code><a title="cardano.wt.blockfrost.BlockfrostApi.get_utxos" href="#cardano.wt.blockfrost.BlockfrostApi.get_utxos">get_utxos</a></code></li>
+<li><code><a title="cardano.wt.blockfrost.BlockfrostApi.submit_txn" href="#cardano.wt.blockfrost.BlockfrostApi.submit_txn">submit_txn</a></code></li>
 </ul>
 </li>
 </ul>

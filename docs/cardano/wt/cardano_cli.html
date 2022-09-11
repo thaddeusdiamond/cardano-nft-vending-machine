@@ -30,6 +30,8 @@
 import os
 import subprocess
 
+from deprecated import deprecated
+
 from cardano.wt.utxo import Utxo
 
 &#34;&#34;&#34;
@@ -37,19 +39,13 @@ cardano-cli *nix script representation in Python
 &#34;&#34;&#34;
 class CardanoCli(object):
 
-    _WITNESS_COUNT = 1
-
-    _MAINNET_PARAM = &#39;--mainnet&#39;
-    _TESTNET_PARAM = &#39;--testnet-magic 1097911063&#39;
-
     TXN_DIR = &#39;txn&#39;
 
-    def __init__(self, mainnet=False, protocol_params=None):
-        self.mainnet = mainnet
+    def __init__(self, protocol_params=None):
         self.protocol_params = protocol_params
 
-    def __run_script(self, cardano_args, add_network=True):
-        cmd = f&#39;cardano-cli {cardano_args} {self.__get_network_flag() if add_network else &#34;&#34;}&#39;
+    def __run_script(self, cardano_args):
+        cmd = f&#39;cardano-cli {cardano_args}&#39;
         print(cmd)
         cli_cmd = subprocess.Popen(cmd,  shell=True, text=True, stdout=subprocess.PIPE)
         (out, err) = cli_cmd.communicate()
@@ -57,74 +53,41 @@ class CardanoCli(object):
         print(f&#39;[STDERR] {err}&#39;)
         return out
 
-    def __get_network_flag(self):
-       return self._MAINNET_PARAM if self.mainnet else self._TESTNET_PARAM
-
     def named_asset_str(nft_policy, nft_names):
         return &#39;+&#39;.join([&#39;.&#39;.join([f&#34;1 {nft_policy}&#34;, nft_name]) for nft_name in nft_names])
 
-    def get_utxos(self, address, exclusions):
-        output = self.__run_script(f&#39;query utxo --address {address}&#39;) 
-        out_lines = output.strip().split(&#39;\n&#39;)
-        available_utxos = set()
-        #print(&#39;EXCLUSIONS\t&#39;, [f&#39;{utxo.hash}#{utxo.ix}&#39; for utxo in exclusions])
-        for out_line in out_lines[2:]:
-            utxo = Utxo.from_cli(out_line)
-            if utxo in exclusions:
-                print(f&#39;Skipping {utxo.hash}#{utxo.ix}&#39;)
-                continue
-            available_utxos.add(utxo)
-        return available_utxos
-
-    def build_txn(self, output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, addl_args): 
-        build_file = os.path.join(output_dir, CardanoCli.TXN_DIR, f&#34;txn_{txn_id}.build&#34;)
-        self.__run_script(
-            f&#39;transaction build --alonzo-era {&#34; &#34;.join(tx_in_args)} {&#34; &#34;.join(tx_out_args)} --change-address {change_addr} \
-                --metadata-json-file {metadata_json_file} --witness-override {witness_override} --out-file {build_file} {&#34; &#34;.join(addl_args)}&#39;
-        )
-        return build_file
-
-    def build_mint_txn(self, output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, mint, nft_names): 
-        named_asset_str = CardanoCli.named_asset_str(selfmint.policy, nft_names)
-        mint_args = [f&#34;--mint=&#39;{named_asset_str}&#39;&#34;, f&#34;--minting-script-file {mint.script}&#34;] if nft_names else []
-        return self.build_txn(output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, mint_args)
-
-    def build_raw_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, addl_args):
+    def build_raw_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, addl_args, era=&#39;--alonzo-era&#39;):
         raw_build_file = os.path.join(output_dir, CardanoCli.TXN_DIR, f&#34;txn_{txn_id}.raw.build&#34;)
+        metadata_file_args = f&#34;--metadata-json-file {metadata_json_file}&#34; if metadata_json_file else &#39;&#39;
         self.__run_script(
-            f&#39;transaction build-raw --fee {fee} --alonzo-era {&#34; &#34;.join(tx_out_args)} {&#34; &#34;.join(tx_in_args)} \
-                --metadata-json-file {metadata_json_file} --out-file {raw_build_file} {&#34; &#34;.join(addl_args)}&#39;,
-            add_network=False
+            f&#39;transaction build-raw --fee {fee} {era} {&#34; &#34;.join(tx_out_args)} {&#34; &#34;.join(tx_in_args)} \
+                {metadata_file_args} --out-file {raw_build_file} {&#34; &#34;.join(addl_args)}&#39;
         )
         return raw_build_file
-    
-    def build_raw_mint_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint, nft_names): 
+
+    def build_raw_mint_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint, nft_names):
         named_asset_str = CardanoCli.named_asset_str(mint.policy, nft_names)
         mint_args = [f&#34;--mint=&#39;{named_asset_str}&#39;&#34;, f&#34;--minting-script-file {mint.script}&#34;] if nft_names else []
+        if mint.initial_slot:
+            mint_args.append(f&#34;--invalid-before {mint.initial_slot}&#34;)
+        if mint.expiration_slot:
+            mint_args.append(f&#34;--invalid-hereafter {mint.expiration_slot}&#34;)
         return self.build_raw_txn(output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint_args)
-   
+
     def calculate_min_fee(self, raw_build_file, tx_in_count, tx_out_count, witness_count):
         lovelace_fee_str = self.__run_script(
             f&#39;transaction calculate-min-fee --tx-body-file {raw_build_file} --tx-in-count {tx_in_count} \
-              --tx-out-count {tx_out_count} --witness-count {witness_count} --protocol-params-file {self.protocol_params}&#39; 
+              --tx-out-count {tx_out_count} --witness-count {witness_count} --protocol-params-file {self.protocol_params}&#39;
         )
         return int(lovelace_fee_str.split(&#39; &#39;)[0])
 
     def sign_txn(self, signing_files, build_file):
         signed_file = f&#34;{build_file}.signed&#34;
         signing_key_args = &#39; &#39;.join([f&#34;--signing-key-file {signing_file}&#34; for signing_file in signing_files])
-        self.__run_script(f&#39;transaction sign {signing_key_args} --tx-body-file {build_file} --out-file {signed_file}&#39;)
-        return signed_file
-
-    def submit_txn(self, signed_file):
-        self.__run_script(f&#39;transaction submit --tx-file {signed_file}&#39;)
-        pass
-
-    def _write_metadata_file(self, txn_id, metadata):
-        metadata_json_file = f&#39;metadata/metadata_{txn_id}.json&#39;
-        with open(metadata_json_file, &#39;w&#39;) as metadata_json_file_out:
-            metadata_json_file_out.write(json.dumps(metadata))
-        return metadata_json_file</code></pre>
+        self.__run_script(
+            f&#39;transaction sign {signing_key_args} --tx-body-file {build_file} --out-file {signed_file}&#39;
+        )
+        return signed_file</code></pre>
 </details>
 </section>
 <section>
@@ -138,7 +101,7 @@ class CardanoCli(object):
 <dl>
 <dt id="cardano.wt.cardano_cli.CardanoCli"><code class="flex name class">
 <span>class <span class="ident">CardanoCli</span></span>
-<span>(</span><span>mainnet=False, protocol_params=None)</span>
+<span>(</span><span>protocol_params=None)</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -148,19 +111,13 @@ class CardanoCli(object):
 </summary>
 <pre><code class="python">class CardanoCli(object):
 
-    _WITNESS_COUNT = 1
-
-    _MAINNET_PARAM = &#39;--mainnet&#39;
-    _TESTNET_PARAM = &#39;--testnet-magic 1097911063&#39;
-
     TXN_DIR = &#39;txn&#39;
 
-    def __init__(self, mainnet=False, protocol_params=None):
-        self.mainnet = mainnet
+    def __init__(self, protocol_params=None):
         self.protocol_params = protocol_params
 
-    def __run_script(self, cardano_args, add_network=True):
-        cmd = f&#39;cardano-cli {cardano_args} {self.__get_network_flag() if add_network else &#34;&#34;}&#39;
+    def __run_script(self, cardano_args):
+        cmd = f&#39;cardano-cli {cardano_args}&#39;
         print(cmd)
         cli_cmd = subprocess.Popen(cmd,  shell=True, text=True, stdout=subprocess.PIPE)
         (out, err) = cli_cmd.communicate()
@@ -168,74 +125,41 @@ class CardanoCli(object):
         print(f&#39;[STDERR] {err}&#39;)
         return out
 
-    def __get_network_flag(self):
-       return self._MAINNET_PARAM if self.mainnet else self._TESTNET_PARAM
-
     def named_asset_str(nft_policy, nft_names):
         return &#39;+&#39;.join([&#39;.&#39;.join([f&#34;1 {nft_policy}&#34;, nft_name]) for nft_name in nft_names])
 
-    def get_utxos(self, address, exclusions):
-        output = self.__run_script(f&#39;query utxo --address {address}&#39;) 
-        out_lines = output.strip().split(&#39;\n&#39;)
-        available_utxos = set()
-        #print(&#39;EXCLUSIONS\t&#39;, [f&#39;{utxo.hash}#{utxo.ix}&#39; for utxo in exclusions])
-        for out_line in out_lines[2:]:
-            utxo = Utxo.from_cli(out_line)
-            if utxo in exclusions:
-                print(f&#39;Skipping {utxo.hash}#{utxo.ix}&#39;)
-                continue
-            available_utxos.add(utxo)
-        return available_utxos
-
-    def build_txn(self, output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, addl_args): 
-        build_file = os.path.join(output_dir, CardanoCli.TXN_DIR, f&#34;txn_{txn_id}.build&#34;)
-        self.__run_script(
-            f&#39;transaction build --alonzo-era {&#34; &#34;.join(tx_in_args)} {&#34; &#34;.join(tx_out_args)} --change-address {change_addr} \
-                --metadata-json-file {metadata_json_file} --witness-override {witness_override} --out-file {build_file} {&#34; &#34;.join(addl_args)}&#39;
-        )
-        return build_file
-
-    def build_mint_txn(self, output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, mint, nft_names): 
-        named_asset_str = CardanoCli.named_asset_str(selfmint.policy, nft_names)
-        mint_args = [f&#34;--mint=&#39;{named_asset_str}&#39;&#34;, f&#34;--minting-script-file {mint.script}&#34;] if nft_names else []
-        return self.build_txn(output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, mint_args)
-
-    def build_raw_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, addl_args):
+    def build_raw_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, addl_args, era=&#39;--alonzo-era&#39;):
         raw_build_file = os.path.join(output_dir, CardanoCli.TXN_DIR, f&#34;txn_{txn_id}.raw.build&#34;)
+        metadata_file_args = f&#34;--metadata-json-file {metadata_json_file}&#34; if metadata_json_file else &#39;&#39;
         self.__run_script(
-            f&#39;transaction build-raw --fee {fee} --alonzo-era {&#34; &#34;.join(tx_out_args)} {&#34; &#34;.join(tx_in_args)} \
-                --metadata-json-file {metadata_json_file} --out-file {raw_build_file} {&#34; &#34;.join(addl_args)}&#39;,
-            add_network=False
+            f&#39;transaction build-raw --fee {fee} {era} {&#34; &#34;.join(tx_out_args)} {&#34; &#34;.join(tx_in_args)} \
+                {metadata_file_args} --out-file {raw_build_file} {&#34; &#34;.join(addl_args)}&#39;
         )
         return raw_build_file
-    
-    def build_raw_mint_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint, nft_names): 
+
+    def build_raw_mint_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint, nft_names):
         named_asset_str = CardanoCli.named_asset_str(mint.policy, nft_names)
         mint_args = [f&#34;--mint=&#39;{named_asset_str}&#39;&#34;, f&#34;--minting-script-file {mint.script}&#34;] if nft_names else []
+        if mint.initial_slot:
+            mint_args.append(f&#34;--invalid-before {mint.initial_slot}&#34;)
+        if mint.expiration_slot:
+            mint_args.append(f&#34;--invalid-hereafter {mint.expiration_slot}&#34;)
         return self.build_raw_txn(output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint_args)
-   
+
     def calculate_min_fee(self, raw_build_file, tx_in_count, tx_out_count, witness_count):
         lovelace_fee_str = self.__run_script(
             f&#39;transaction calculate-min-fee --tx-body-file {raw_build_file} --tx-in-count {tx_in_count} \
-              --tx-out-count {tx_out_count} --witness-count {witness_count} --protocol-params-file {self.protocol_params}&#39; 
+              --tx-out-count {tx_out_count} --witness-count {witness_count} --protocol-params-file {self.protocol_params}&#39;
         )
         return int(lovelace_fee_str.split(&#39; &#39;)[0])
 
     def sign_txn(self, signing_files, build_file):
         signed_file = f&#34;{build_file}.signed&#34;
         signing_key_args = &#39; &#39;.join([f&#34;--signing-key-file {signing_file}&#34; for signing_file in signing_files])
-        self.__run_script(f&#39;transaction sign {signing_key_args} --tx-body-file {build_file} --out-file {signed_file}&#39;)
-        return signed_file
-
-    def submit_txn(self, signed_file):
-        self.__run_script(f&#39;transaction submit --tx-file {signed_file}&#39;)
-        pass
-
-    def _write_metadata_file(self, txn_id, metadata):
-        metadata_json_file = f&#39;metadata/metadata_{txn_id}.json&#39;
-        with open(metadata_json_file, &#39;w&#39;) as metadata_json_file_out:
-            metadata_json_file_out.write(json.dumps(metadata))
-        return metadata_json_file</code></pre>
+        self.__run_script(
+            f&#39;transaction sign {signing_key_args} --tx-body-file {build_file} --out-file {signed_file}&#39;
+        )
+        return signed_file</code></pre>
 </details>
 <h3>Class variables</h3>
 <dl>
@@ -246,21 +170,6 @@ class CardanoCli(object):
 </dl>
 <h3>Methods</h3>
 <dl>
-<dt id="cardano.wt.cardano_cli.CardanoCli.build_mint_txn"><code class="name flex">
-<span>def <span class="ident">build_mint_txn</span></span>(<span>self, output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, mint, nft_names)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def build_mint_txn(self, output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, mint, nft_names): 
-    named_asset_str = CardanoCli.named_asset_str(selfmint.policy, nft_names)
-    mint_args = [f&#34;--mint=&#39;{named_asset_str}&#39;&#34;, f&#34;--minting-script-file {mint.script}&#34;] if nft_names else []
-    return self.build_txn(output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, mint_args)</code></pre>
-</details>
-</dd>
 <dt id="cardano.wt.cardano_cli.CardanoCli.build_raw_mint_txn"><code class="name flex">
 <span>def <span class="ident">build_raw_mint_txn</span></span>(<span>self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint, nft_names)</span>
 </code></dt>
@@ -270,14 +179,18 @@ class CardanoCli(object):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def build_raw_mint_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint, nft_names): 
+<pre><code class="python">def build_raw_mint_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint, nft_names):
     named_asset_str = CardanoCli.named_asset_str(mint.policy, nft_names)
     mint_args = [f&#34;--mint=&#39;{named_asset_str}&#39;&#34;, f&#34;--minting-script-file {mint.script}&#34;] if nft_names else []
+    if mint.initial_slot:
+        mint_args.append(f&#34;--invalid-before {mint.initial_slot}&#34;)
+    if mint.expiration_slot:
+        mint_args.append(f&#34;--invalid-hereafter {mint.expiration_slot}&#34;)
     return self.build_raw_txn(output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint_args)</code></pre>
 </details>
 </dd>
 <dt id="cardano.wt.cardano_cli.CardanoCli.build_raw_txn"><code class="name flex">
-<span>def <span class="ident">build_raw_txn</span></span>(<span>self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, addl_args)</span>
+<span>def <span class="ident">build_raw_txn</span></span>(<span>self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, addl_args, era='--alonzo-era')</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -285,32 +198,14 @@ class CardanoCli(object):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def build_raw_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, addl_args):
+<pre><code class="python">def build_raw_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, addl_args, era=&#39;--alonzo-era&#39;):
     raw_build_file = os.path.join(output_dir, CardanoCli.TXN_DIR, f&#34;txn_{txn_id}.raw.build&#34;)
+    metadata_file_args = f&#34;--metadata-json-file {metadata_json_file}&#34; if metadata_json_file else &#39;&#39;
     self.__run_script(
-        f&#39;transaction build-raw --fee {fee} --alonzo-era {&#34; &#34;.join(tx_out_args)} {&#34; &#34;.join(tx_in_args)} \
-            --metadata-json-file {metadata_json_file} --out-file {raw_build_file} {&#34; &#34;.join(addl_args)}&#39;,
-        add_network=False
+        f&#39;transaction build-raw --fee {fee} {era} {&#34; &#34;.join(tx_out_args)} {&#34; &#34;.join(tx_in_args)} \
+            {metadata_file_args} --out-file {raw_build_file} {&#34; &#34;.join(addl_args)}&#39;
     )
     return raw_build_file</code></pre>
-</details>
-</dd>
-<dt id="cardano.wt.cardano_cli.CardanoCli.build_txn"><code class="name flex">
-<span>def <span class="ident">build_txn</span></span>(<span>self, output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, addl_args)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def build_txn(self, output_dir, txn_id, change_addr, tx_in_args, tx_out_args, metadata_json_file, witness_override, addl_args): 
-    build_file = os.path.join(output_dir, CardanoCli.TXN_DIR, f&#34;txn_{txn_id}.build&#34;)
-    self.__run_script(
-        f&#39;transaction build --alonzo-era {&#34; &#34;.join(tx_in_args)} {&#34; &#34;.join(tx_out_args)} --change-address {change_addr} \
-            --metadata-json-file {metadata_json_file} --witness-override {witness_override} --out-file {build_file} {&#34; &#34;.join(addl_args)}&#39;
-    )
-    return build_file</code></pre>
 </details>
 </dd>
 <dt id="cardano.wt.cardano_cli.CardanoCli.calculate_min_fee"><code class="name flex">
@@ -325,32 +220,9 @@ class CardanoCli(object):
 <pre><code class="python">def calculate_min_fee(self, raw_build_file, tx_in_count, tx_out_count, witness_count):
     lovelace_fee_str = self.__run_script(
         f&#39;transaction calculate-min-fee --tx-body-file {raw_build_file} --tx-in-count {tx_in_count} \
-          --tx-out-count {tx_out_count} --witness-count {witness_count} --protocol-params-file {self.protocol_params}&#39; 
+          --tx-out-count {tx_out_count} --witness-count {witness_count} --protocol-params-file {self.protocol_params}&#39;
     )
     return int(lovelace_fee_str.split(&#39; &#39;)[0])</code></pre>
-</details>
-</dd>
-<dt id="cardano.wt.cardano_cli.CardanoCli.get_utxos"><code class="name flex">
-<span>def <span class="ident">get_utxos</span></span>(<span>self, address, exclusions)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def get_utxos(self, address, exclusions):
-    output = self.__run_script(f&#39;query utxo --address {address}&#39;) 
-    out_lines = output.strip().split(&#39;\n&#39;)
-    available_utxos = set()
-    #print(&#39;EXCLUSIONS\t&#39;, [f&#39;{utxo.hash}#{utxo.ix}&#39; for utxo in exclusions])
-    for out_line in out_lines[2:]:
-        utxo = Utxo.from_cli(out_line)
-        if utxo in exclusions:
-            print(f&#39;Skipping {utxo.hash}#{utxo.ix}&#39;)
-            continue
-        available_utxos.add(utxo)
-    return available_utxos</code></pre>
 </details>
 </dd>
 <dt id="cardano.wt.cardano_cli.CardanoCli.named_asset_str"><code class="name flex">
@@ -378,22 +250,10 @@ class CardanoCli(object):
 <pre><code class="python">def sign_txn(self, signing_files, build_file):
     signed_file = f&#34;{build_file}.signed&#34;
     signing_key_args = &#39; &#39;.join([f&#34;--signing-key-file {signing_file}&#34; for signing_file in signing_files])
-    self.__run_script(f&#39;transaction sign {signing_key_args} --tx-body-file {build_file} --out-file {signed_file}&#39;)
+    self.__run_script(
+        f&#39;transaction sign {signing_key_args} --tx-body-file {build_file} --out-file {signed_file}&#39;
+    )
     return signed_file</code></pre>
-</details>
-</dd>
-<dt id="cardano.wt.cardano_cli.CardanoCli.submit_txn"><code class="name flex">
-<span>def <span class="ident">submit_txn</span></span>(<span>self, signed_file)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def submit_txn(self, signed_file):
-    self.__run_script(f&#39;transaction submit --tx-file {signed_file}&#39;)
-    pass</code></pre>
 </details>
 </dd>
 </dl>
@@ -418,15 +278,11 @@ class CardanoCli(object):
 <h4><code><a title="cardano.wt.cardano_cli.CardanoCli" href="#cardano.wt.cardano_cli.CardanoCli">CardanoCli</a></code></h4>
 <ul class="two-column">
 <li><code><a title="cardano.wt.cardano_cli.CardanoCli.TXN_DIR" href="#cardano.wt.cardano_cli.CardanoCli.TXN_DIR">TXN_DIR</a></code></li>
-<li><code><a title="cardano.wt.cardano_cli.CardanoCli.build_mint_txn" href="#cardano.wt.cardano_cli.CardanoCli.build_mint_txn">build_mint_txn</a></code></li>
 <li><code><a title="cardano.wt.cardano_cli.CardanoCli.build_raw_mint_txn" href="#cardano.wt.cardano_cli.CardanoCli.build_raw_mint_txn">build_raw_mint_txn</a></code></li>
 <li><code><a title="cardano.wt.cardano_cli.CardanoCli.build_raw_txn" href="#cardano.wt.cardano_cli.CardanoCli.build_raw_txn">build_raw_txn</a></code></li>
-<li><code><a title="cardano.wt.cardano_cli.CardanoCli.build_txn" href="#cardano.wt.cardano_cli.CardanoCli.build_txn">build_txn</a></code></li>
 <li><code><a title="cardano.wt.cardano_cli.CardanoCli.calculate_min_fee" href="#cardano.wt.cardano_cli.CardanoCli.calculate_min_fee">calculate_min_fee</a></code></li>
-<li><code><a title="cardano.wt.cardano_cli.CardanoCli.get_utxos" href="#cardano.wt.cardano_cli.CardanoCli.get_utxos">get_utxos</a></code></li>
 <li><code><a title="cardano.wt.cardano_cli.CardanoCli.named_asset_str" href="#cardano.wt.cardano_cli.CardanoCli.named_asset_str">named_asset_str</a></code></li>
 <li><code><a title="cardano.wt.cardano_cli.CardanoCli.sign_txn" href="#cardano.wt.cardano_cli.CardanoCli.sign_txn">sign_txn</a></code></li>
-<li><code><a title="cardano.wt.cardano_cli.CardanoCli.submit_txn" href="#cardano.wt.cardano_cli.CardanoCli.submit_txn">submit_txn</a></code></li>
 </ul>
 </li>
 </ul>

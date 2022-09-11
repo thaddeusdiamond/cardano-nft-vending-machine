@@ -29,34 +29,50 @@
 <pre><code class="python">import json
 import math
 import os
+import random
 import shutil
 import time
+import traceback
 
 from cardano.wt.cardano_cli import CardanoCli
+from cardano.wt.mint import Mint
 from cardano.wt.utxo import Utxo
+
+class BadUtxoError(ValueError):
+
+    def __init__(self, utxo, message):
+        super().__init__(message)
+        self.utxo = utxo
 
 class NftVendingMachine(object):
 
-    __WITNESS_COUNT = 2
+    __SINGLE_POLICY = 1
+    __ERROR_WAIT = 30
 
-    def __get_donation_addr(mainnet):
+    def as_json(self):
+        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+
+    def _get_donation_addr(mainnet):
         if mainnet:
             return &#39;addr1qx2skanhkpgdhcyxnczydg3meqcv87z4vep7u2drrr6277v5entql0xseq6a4zs8j524wvwv6k46kpf8pt9ejjk6l9gs4g94mf&#39;
         return &#39;addr_test1vrce7uwk8vcva5j4dmehrxprwy57x20yaz9cv9vqzjutnnsrgrfey&#39;
 
-    def __init__(self, payment_addr, payment_sign_key, profit_addr, mint, blockfrost_api, cardano_cli, mainnet=False):
+    def __init__(self, payment_addr, payment_sign_key, profit_addr, vend_randomly, single_vend_max, mint, blockfrost_api, cardano_cli, mainnet=False):
         self.payment_addr = payment_addr
         self.payment_sign_key = payment_sign_key
         self.profit_addr = profit_addr
+        self.vend_randomly = vend_randomly
+        self.single_vend_max = single_vend_max
         self.mint = mint
         self.blockfrost_api = blockfrost_api
         self.cardano_cli = cardano_cli
-        self.donation_addr = NftVendingMachine.__get_donation_addr(mainnet)
+        self.donation_addr = NftVendingMachine._get_donation_addr(mainnet)
+        self.__is_validated = False
 
     def __get_tx_out_args(self, input_addr, change, nft_names, total_profit, total_donation):
         user_tokens = filter(None, [input_addr, str(change), CardanoCli.named_asset_str(self.mint.policy, nft_names)])
         user_output = f&#34;--tx-out &#39;{&#39;+&#39;.join(user_tokens)}&#39;&#34;
-        profit_output = f&#34;--tx-out &#39;{self.profit_addr}+{total_profit}&#39;&#34; if total_profit else &#39;&#39; 
+        profit_output = f&#34;--tx-out &#39;{self.profit_addr}+{total_profit}&#39;&#34; if total_profit else &#39;&#39;
         donation_output = f&#34;--tx-out &#39;{self.donation_addr}+{total_donation}&#39;&#34; if total_donation else &#39;&#39;
         return [user_output, profit_output, donation_output]
 
@@ -66,6 +82,11 @@ class NftVendingMachine(object):
             names = policy_json.keys()
             return [name.encode(&#39;UTF-8&#39;).hex() for name in names]
 
+    def __get_nft_names_from(self, metadata_file):
+        with open(metadata_file, &#39;r&#39;) as metadata_filehandle:
+            policy_json = json.load(metadata_filehandle)[&#39;721&#39;][self.mint.policy]
+            return policy_json.keys()
+
     def __lock_and_merge(self, available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id):
         combined_nft_metadata = {}
         for i in range(num_mints):
@@ -74,8 +95,6 @@ class NftVendingMachine(object):
             with open(mint_metadata_orig, &#39;r&#39;) as mint_metadata_handle:
                 mint_metadata = json.load(mint_metadata_handle)
                 for nft_name, nft_metadata in mint_metadata[&#39;721&#39;][self.mint.policy].items():
-                    if nft_name in combined_nft_metadata:
-                        raise ValueError(f&#34;Duplicate NFT metadata for {nft_name} found&#34;)
                     combined_nft_metadata[nft_name] = nft_metadata
             mint_metadata_locked = os.path.join(output_dir, locked_subdir, mint_metadata_filename)
             shutil.move(mint_metadata_orig, mint_metadata_locked)
@@ -84,43 +103,107 @@ class NftVendingMachine(object):
             json.dump({&#39;721&#39;: { self.mint.policy : combined_nft_metadata }}, combined_metadata_handle)
         return combined_output_path
 
+    def __do_vend(self, mint_req, output_dir, locked_subdir, metadata_subdir):
+        available_mints = os.listdir(self.mint.nfts_dir)
+        if not available_mints:
+            print(&#34;WARNING: Metadata directory is empty, please restock the vending machine...&#34;)
+        elif self.vend_randomly:
+            random.shuffle(available_mints)
+
+        utxo_inputs = self.blockfrost_api.get_inputs(mint_req.hash)
+        input_addrs = set([utxo_input[&#39;address&#39;] for utxo_input in utxo_inputs])
+        if len(input_addrs) &lt; 1:
+            raise BadUtxoError(mint_req, f&#34;Txn hash {txn_hash} has no valid addresses ({utxo_inputs}), aborting...&#34;)
+        input_addr = input_addrs.pop()
+
+        non_lovelace_bals = [balance for balance in mint_req.balances if balance.policy != Utxo.Balance.LOVELACE_POLICY]
+        if non_lovelace_bals:
+            raise BadUtxoError(mint_req, f&#34;Cannot accept non-lovelace balances as payment&#34;)
+
+        lovelace_bals = [balance for balance in mint_req.balances if balance.policy == Utxo.Balance.LOVELACE_POLICY]
+        if len(lovelace_bals) != 1:
+            raise BadUtxoError(mint_req, f&#34;Found too many/few lovelace balances for UTXO {mint_req}&#34;)
+
+        lovelace_bal = lovelace_bals.pop()
+        num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price) if self.mint.price else self.single_vend_max
+        wl_availability = self.mint.whitelist.available(utxo_inputs)
+        num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested, wl_availability)
+
+        if not self.mint.price and self.max_rebate &gt; lovelace_bal.lovelace:
+            print(f&#34;Payment of {lovelace_bal.lovelace} might cause minUTxO error for {num_mints} NFTs, refunding instead...&#34;)
+            num_mints = 0
+
+        gross_profit = num_mints * self.mint.price
+        change = lovelace_bal.lovelace - gross_profit
+
+        print(f&#34;Beginning to mint {num_mints} NFTs to send to address {input_addr}&#34;)
+        txn_id = int(time.time())
+        nft_metadata_file = self.__lock_and_merge(available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id)
+        nft_names = self.__generate_nft_names_from(nft_metadata_file)
+
+        total_name_chars = sum([len(name) for name in self.__get_nft_names_from(nft_metadata_file)])
+        user_rebate = Mint.RebateCalculator.calculate_rebate_for(NftVendingMachine.__SINGLE_POLICY, num_mints, total_name_chars) if self.mint.price else 0
+        net_profit = gross_profit - self.mint.donation - user_rebate
+        print(f&#34;Minimum rebate to user is {user_rebate}, net profit to vault is {net_profit}&#34;)
+
+        tx_ins = [f&#34;--tx-in {mint_req.hash}#{mint_req.ix}&#34;]
+        tx_outs = self.__get_tx_out_args(input_addr, user_rebate + change, nft_names, net_profit, self.mint.donation)
+        mint_build_tmp = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, 0, nft_metadata_file, self.mint, nft_names)
+
+        tx_in_count = len(tx_ins)
+        tx_out_count = len([tx_out for tx_out in tx_outs if tx_out])
+        signers = [self.payment_sign_key]
+        if num_mints:
+            signers.append(self.mint.sign_key)
+        fee = self.cardano_cli.calculate_min_fee(mint_build_tmp, tx_in_count, tx_out_count, len(signers))
+
+        if net_profit:
+            net_profit = net_profit - fee
+        else:
+            change = change - fee
+
+        final_change = user_rebate + change
+        if (final_change and (final_change &lt; Utxo.MIN_UTXO_VALUE)) or (net_profit and (net_profit &lt; Utxo.MIN_UTXO_VALUE)):
+            raise BadUtxoError(mint_req, f&#34;UTxO left change of {change}, and net_profit of {net_profit}, causing a minUTxO error&#34;)
+
+        tx_outs = self.__get_tx_out_args(input_addr, final_change, nft_names, net_profit, self.mint.donation)
+        mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
+        mint_signed = self.cardano_cli.sign_txn(signers, mint_build)
+        self.blockfrost_api.submit_txn(mint_signed)
+        self.mint.whitelist.consume(utxo_inputs, num_mints)
+
     def vend(self, output_dir, locked_subdir, metadata_subdir, exclusions):
-        mint_reqs = self.cardano_cli.get_utxos(self.payment_addr, exclusions) 
+        if not self.__is_validated:
+            raise ValueError(&#39;Attempting to vend from non-validated vending machine&#39;)
+        mint_reqs = self.blockfrost_api.get_utxos(self.payment_addr, exclusions)
         for mint_req in mint_reqs:
-            available_mints = os.listdir(self.mint.nfts_dir)
-            if not available_mints:
-                print(&#34;Metadata directory is empty, please restock the vending machine...&#34;)
-                break
-
-            input_addr = self.blockfrost_api.get_input_address(mint_req.hash)
-            lovelace_bals = [balance for balance in mint_req.balances if balance.policy == Utxo.Balance.LOVELACE_POLICY]
-            if len(lovelace_bals) != 1:
-                raise ValueError(f&#34;Found too many/few lovelace balances for UTXO {mint_req}&#34;)
-
-            lovelace_bal = lovelace_bals.pop()
-            num_mints = min(len(available_mints), math.floor((lovelace_bal.lovelace - self.mint.rebate) / self.mint.price))
-            total_profit = num_mints * (self.mint.price - self.mint.donation) 
-            total_donation = num_mints * self.mint.donation
-            change = lovelace_bal.lovelace - (total_profit + total_donation)
-            print(f&#34;Beginning to mint {num_mints} NFTs to send to address {input_addr} (change: {change})&#34;)
-
             exclusions.add(mint_req)
+            try:
+                self.__do_vend(mint_req, output_dir, locked_subdir, metadata_subdir)
+            except BadUtxoError as e:
+                print(f&#34;UNRECOVERABLE UTXO ERROR\n{e.utxo}\n^--- REQUIRES INVESTIGATION&#34;)
+                print(traceback.format_exc())
+            except Exception as e:
+                print(f&#34;WARNING: Uncaught exception for {mint_req}, not adding to exclusions (RETRY WILL BE ATTEMPTED)&#34;)
+                print(traceback.format_exc())
+                time.sleep(NftVendingMachine.__ERROR_WAIT)
 
-            txn_id = int(time.time())
-            nft_metadata_file = self.__lock_and_merge(available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id)
-            nft_names = self.__generate_nft_names_from(nft_metadata_file)
-            tx_ins = [f&#34;--tx-in {mint_req.hash}#{mint_req.ix}&#34;]
-            tx_outs = self.__get_tx_out_args(input_addr, change, nft_names, total_profit, total_donation)
-            mint_build_tmp = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, 0, nft_metadata_file, self.mint, nft_names)
+    def validate(self):
+        if self.payment_addr == self.profit_addr:
+            raise ValueError(f&#34;Payment address and profit address ({self.payment_addr}) cannot be the same!&#34;)
+        self.mint.validate()
+        self.max_rebate = self.__max_rebate_for(self.mint.validated_names)
+        if self.mint.price and self.mint.price &lt; (self.max_rebate + self.mint.donation + Utxo.MIN_UTXO_VALUE):
+            raise ValueError(f&#34;Price of {self.mint.price} with donation of {self.mint.donation} could lead to a minUTxO error due to rebates&#34;)
+        self.__is_validated = True
 
-            tx_in_count = len(tx_ins)
-            tx_out_count = len([tx_out for tx_out in tx_outs if tx_out])
-            fee = self.cardano_cli.calculate_min_fee(mint_build_tmp, tx_in_count, tx_out_count, NftVendingMachine.__WITNESS_COUNT)
-
-            tx_outs = self.__get_tx_out_args(input_addr, change - fee, nft_names, total_profit, total_donation)
-            mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
-            mint_signed = self.cardano_cli.sign_txn([self.payment_sign_key, self.mint.sign_key], mint_build)
-            self.cardano_cli.submit_txn(mint_signed)</code></pre>
+    def __max_rebate_for(self, nft_names):
+        max_len = 0 if not nft_names else max([len(nft_name) for nft_name in nft_names])
+        return Mint.RebateCalculator.calculate_rebate_for(
+            NftVendingMachine.__SINGLE_POLICY,
+            self.single_vend_max,
+            max_len * self.single_vend_max
+        )</code></pre>
 </details>
 </section>
 <section>
@@ -132,9 +215,32 @@ class NftVendingMachine(object):
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
+<dt id="cardano.wt.nft_vending_machine.BadUtxoError"><code class="flex name class">
+<span>class <span class="ident">BadUtxoError</span></span>
+<span>(</span><span>utxo, message)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Inappropriate argument value (of correct type).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class BadUtxoError(ValueError):
+
+    def __init__(self, utxo, message):
+        super().__init__(message)
+        self.utxo = utxo</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.ValueError</li>
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
 <dt id="cardano.wt.nft_vending_machine.NftVendingMachine"><code class="flex name class">
 <span>class <span class="ident">NftVendingMachine</span></span>
-<span>(</span><span>payment_addr, payment_sign_key, profit_addr, mint, blockfrost_api, cardano_cli, mainnet=False)</span>
+<span>(</span><span>payment_addr, payment_sign_key, profit_addr, vend_randomly, single_vend_max, mint, blockfrost_api, cardano_cli, mainnet=False)</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -144,26 +250,33 @@ class NftVendingMachine(object):
 </summary>
 <pre><code class="python">class NftVendingMachine(object):
 
-    __WITNESS_COUNT = 2
+    __SINGLE_POLICY = 1
+    __ERROR_WAIT = 30
 
-    def __get_donation_addr(mainnet):
+    def as_json(self):
+        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+
+    def _get_donation_addr(mainnet):
         if mainnet:
             return &#39;addr1qx2skanhkpgdhcyxnczydg3meqcv87z4vep7u2drrr6277v5entql0xseq6a4zs8j524wvwv6k46kpf8pt9ejjk6l9gs4g94mf&#39;
         return &#39;addr_test1vrce7uwk8vcva5j4dmehrxprwy57x20yaz9cv9vqzjutnnsrgrfey&#39;
 
-    def __init__(self, payment_addr, payment_sign_key, profit_addr, mint, blockfrost_api, cardano_cli, mainnet=False):
+    def __init__(self, payment_addr, payment_sign_key, profit_addr, vend_randomly, single_vend_max, mint, blockfrost_api, cardano_cli, mainnet=False):
         self.payment_addr = payment_addr
         self.payment_sign_key = payment_sign_key
         self.profit_addr = profit_addr
+        self.vend_randomly = vend_randomly
+        self.single_vend_max = single_vend_max
         self.mint = mint
         self.blockfrost_api = blockfrost_api
         self.cardano_cli = cardano_cli
-        self.donation_addr = NftVendingMachine.__get_donation_addr(mainnet)
+        self.donation_addr = NftVendingMachine._get_donation_addr(mainnet)
+        self.__is_validated = False
 
     def __get_tx_out_args(self, input_addr, change, nft_names, total_profit, total_donation):
         user_tokens = filter(None, [input_addr, str(change), CardanoCli.named_asset_str(self.mint.policy, nft_names)])
         user_output = f&#34;--tx-out &#39;{&#39;+&#39;.join(user_tokens)}&#39;&#34;
-        profit_output = f&#34;--tx-out &#39;{self.profit_addr}+{total_profit}&#39;&#34; if total_profit else &#39;&#39; 
+        profit_output = f&#34;--tx-out &#39;{self.profit_addr}+{total_profit}&#39;&#34; if total_profit else &#39;&#39;
         donation_output = f&#34;--tx-out &#39;{self.donation_addr}+{total_donation}&#39;&#34; if total_donation else &#39;&#39;
         return [user_output, profit_output, donation_output]
 
@@ -173,6 +286,11 @@ class NftVendingMachine(object):
             names = policy_json.keys()
             return [name.encode(&#39;UTF-8&#39;).hex() for name in names]
 
+    def __get_nft_names_from(self, metadata_file):
+        with open(metadata_file, &#39;r&#39;) as metadata_filehandle:
+            policy_json = json.load(metadata_filehandle)[&#39;721&#39;][self.mint.policy]
+            return policy_json.keys()
+
     def __lock_and_merge(self, available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id):
         combined_nft_metadata = {}
         for i in range(num_mints):
@@ -181,8 +299,6 @@ class NftVendingMachine(object):
             with open(mint_metadata_orig, &#39;r&#39;) as mint_metadata_handle:
                 mint_metadata = json.load(mint_metadata_handle)
                 for nft_name, nft_metadata in mint_metadata[&#39;721&#39;][self.mint.policy].items():
-                    if nft_name in combined_nft_metadata:
-                        raise ValueError(f&#34;Duplicate NFT metadata for {nft_name} found&#34;)
                     combined_nft_metadata[nft_name] = nft_metadata
             mint_metadata_locked = os.path.join(output_dir, locked_subdir, mint_metadata_filename)
             shutil.move(mint_metadata_orig, mint_metadata_locked)
@@ -191,46 +307,142 @@ class NftVendingMachine(object):
             json.dump({&#39;721&#39;: { self.mint.policy : combined_nft_metadata }}, combined_metadata_handle)
         return combined_output_path
 
+    def __do_vend(self, mint_req, output_dir, locked_subdir, metadata_subdir):
+        available_mints = os.listdir(self.mint.nfts_dir)
+        if not available_mints:
+            print(&#34;WARNING: Metadata directory is empty, please restock the vending machine...&#34;)
+        elif self.vend_randomly:
+            random.shuffle(available_mints)
+
+        utxo_inputs = self.blockfrost_api.get_inputs(mint_req.hash)
+        input_addrs = set([utxo_input[&#39;address&#39;] for utxo_input in utxo_inputs])
+        if len(input_addrs) &lt; 1:
+            raise BadUtxoError(mint_req, f&#34;Txn hash {txn_hash} has no valid addresses ({utxo_inputs}), aborting...&#34;)
+        input_addr = input_addrs.pop()
+
+        non_lovelace_bals = [balance for balance in mint_req.balances if balance.policy != Utxo.Balance.LOVELACE_POLICY]
+        if non_lovelace_bals:
+            raise BadUtxoError(mint_req, f&#34;Cannot accept non-lovelace balances as payment&#34;)
+
+        lovelace_bals = [balance for balance in mint_req.balances if balance.policy == Utxo.Balance.LOVELACE_POLICY]
+        if len(lovelace_bals) != 1:
+            raise BadUtxoError(mint_req, f&#34;Found too many/few lovelace balances for UTXO {mint_req}&#34;)
+
+        lovelace_bal = lovelace_bals.pop()
+        num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price) if self.mint.price else self.single_vend_max
+        wl_availability = self.mint.whitelist.available(utxo_inputs)
+        num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested, wl_availability)
+
+        if not self.mint.price and self.max_rebate &gt; lovelace_bal.lovelace:
+            print(f&#34;Payment of {lovelace_bal.lovelace} might cause minUTxO error for {num_mints} NFTs, refunding instead...&#34;)
+            num_mints = 0
+
+        gross_profit = num_mints * self.mint.price
+        change = lovelace_bal.lovelace - gross_profit
+
+        print(f&#34;Beginning to mint {num_mints} NFTs to send to address {input_addr}&#34;)
+        txn_id = int(time.time())
+        nft_metadata_file = self.__lock_and_merge(available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id)
+        nft_names = self.__generate_nft_names_from(nft_metadata_file)
+
+        total_name_chars = sum([len(name) for name in self.__get_nft_names_from(nft_metadata_file)])
+        user_rebate = Mint.RebateCalculator.calculate_rebate_for(NftVendingMachine.__SINGLE_POLICY, num_mints, total_name_chars) if self.mint.price else 0
+        net_profit = gross_profit - self.mint.donation - user_rebate
+        print(f&#34;Minimum rebate to user is {user_rebate}, net profit to vault is {net_profit}&#34;)
+
+        tx_ins = [f&#34;--tx-in {mint_req.hash}#{mint_req.ix}&#34;]
+        tx_outs = self.__get_tx_out_args(input_addr, user_rebate + change, nft_names, net_profit, self.mint.donation)
+        mint_build_tmp = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, 0, nft_metadata_file, self.mint, nft_names)
+
+        tx_in_count = len(tx_ins)
+        tx_out_count = len([tx_out for tx_out in tx_outs if tx_out])
+        signers = [self.payment_sign_key]
+        if num_mints:
+            signers.append(self.mint.sign_key)
+        fee = self.cardano_cli.calculate_min_fee(mint_build_tmp, tx_in_count, tx_out_count, len(signers))
+
+        if net_profit:
+            net_profit = net_profit - fee
+        else:
+            change = change - fee
+
+        final_change = user_rebate + change
+        if (final_change and (final_change &lt; Utxo.MIN_UTXO_VALUE)) or (net_profit and (net_profit &lt; Utxo.MIN_UTXO_VALUE)):
+            raise BadUtxoError(mint_req, f&#34;UTxO left change of {change}, and net_profit of {net_profit}, causing a minUTxO error&#34;)
+
+        tx_outs = self.__get_tx_out_args(input_addr, final_change, nft_names, net_profit, self.mint.donation)
+        mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
+        mint_signed = self.cardano_cli.sign_txn(signers, mint_build)
+        self.blockfrost_api.submit_txn(mint_signed)
+        self.mint.whitelist.consume(utxo_inputs, num_mints)
+
     def vend(self, output_dir, locked_subdir, metadata_subdir, exclusions):
-        mint_reqs = self.cardano_cli.get_utxos(self.payment_addr, exclusions) 
+        if not self.__is_validated:
+            raise ValueError(&#39;Attempting to vend from non-validated vending machine&#39;)
+        mint_reqs = self.blockfrost_api.get_utxos(self.payment_addr, exclusions)
         for mint_req in mint_reqs:
-            available_mints = os.listdir(self.mint.nfts_dir)
-            if not available_mints:
-                print(&#34;Metadata directory is empty, please restock the vending machine...&#34;)
-                break
-
-            input_addr = self.blockfrost_api.get_input_address(mint_req.hash)
-            lovelace_bals = [balance for balance in mint_req.balances if balance.policy == Utxo.Balance.LOVELACE_POLICY]
-            if len(lovelace_bals) != 1:
-                raise ValueError(f&#34;Found too many/few lovelace balances for UTXO {mint_req}&#34;)
-
-            lovelace_bal = lovelace_bals.pop()
-            num_mints = min(len(available_mints), math.floor((lovelace_bal.lovelace - self.mint.rebate) / self.mint.price))
-            total_profit = num_mints * (self.mint.price - self.mint.donation) 
-            total_donation = num_mints * self.mint.donation
-            change = lovelace_bal.lovelace - (total_profit + total_donation)
-            print(f&#34;Beginning to mint {num_mints} NFTs to send to address {input_addr} (change: {change})&#34;)
-
             exclusions.add(mint_req)
+            try:
+                self.__do_vend(mint_req, output_dir, locked_subdir, metadata_subdir)
+            except BadUtxoError as e:
+                print(f&#34;UNRECOVERABLE UTXO ERROR\n{e.utxo}\n^--- REQUIRES INVESTIGATION&#34;)
+                print(traceback.format_exc())
+            except Exception as e:
+                print(f&#34;WARNING: Uncaught exception for {mint_req}, not adding to exclusions (RETRY WILL BE ATTEMPTED)&#34;)
+                print(traceback.format_exc())
+                time.sleep(NftVendingMachine.__ERROR_WAIT)
 
-            txn_id = int(time.time())
-            nft_metadata_file = self.__lock_and_merge(available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id)
-            nft_names = self.__generate_nft_names_from(nft_metadata_file)
-            tx_ins = [f&#34;--tx-in {mint_req.hash}#{mint_req.ix}&#34;]
-            tx_outs = self.__get_tx_out_args(input_addr, change, nft_names, total_profit, total_donation)
-            mint_build_tmp = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, 0, nft_metadata_file, self.mint, nft_names)
+    def validate(self):
+        if self.payment_addr == self.profit_addr:
+            raise ValueError(f&#34;Payment address and profit address ({self.payment_addr}) cannot be the same!&#34;)
+        self.mint.validate()
+        self.max_rebate = self.__max_rebate_for(self.mint.validated_names)
+        if self.mint.price and self.mint.price &lt; (self.max_rebate + self.mint.donation + Utxo.MIN_UTXO_VALUE):
+            raise ValueError(f&#34;Price of {self.mint.price} with donation of {self.mint.donation} could lead to a minUTxO error due to rebates&#34;)
+        self.__is_validated = True
 
-            tx_in_count = len(tx_ins)
-            tx_out_count = len([tx_out for tx_out in tx_outs if tx_out])
-            fee = self.cardano_cli.calculate_min_fee(mint_build_tmp, tx_in_count, tx_out_count, NftVendingMachine.__WITNESS_COUNT)
-
-            tx_outs = self.__get_tx_out_args(input_addr, change - fee, nft_names, total_profit, total_donation)
-            mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
-            mint_signed = self.cardano_cli.sign_txn([self.payment_sign_key, self.mint.sign_key], mint_build)
-            self.cardano_cli.submit_txn(mint_signed)</code></pre>
+    def __max_rebate_for(self, nft_names):
+        max_len = 0 if not nft_names else max([len(nft_name) for nft_name in nft_names])
+        return Mint.RebateCalculator.calculate_rebate_for(
+            NftVendingMachine.__SINGLE_POLICY,
+            self.single_vend_max,
+            max_len * self.single_vend_max
+        )</code></pre>
 </details>
 <h3>Methods</h3>
 <dl>
+<dt id="cardano.wt.nft_vending_machine.NftVendingMachine.as_json"><code class="name flex">
+<span>def <span class="ident">as_json</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def as_json(self):
+    return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)</code></pre>
+</details>
+</dd>
+<dt id="cardano.wt.nft_vending_machine.NftVendingMachine.validate"><code class="name flex">
+<span>def <span class="ident">validate</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def validate(self):
+    if self.payment_addr == self.profit_addr:
+        raise ValueError(f&#34;Payment address and profit address ({self.payment_addr}) cannot be the same!&#34;)
+    self.mint.validate()
+    self.max_rebate = self.__max_rebate_for(self.mint.validated_names)
+    if self.mint.price and self.mint.price &lt; (self.max_rebate + self.mint.donation + Utxo.MIN_UTXO_VALUE):
+        raise ValueError(f&#34;Price of {self.mint.price} with donation of {self.mint.donation} could lead to a minUTxO error due to rebates&#34;)
+    self.__is_validated = True</code></pre>
+</details>
+</dd>
 <dt id="cardano.wt.nft_vending_machine.NftVendingMachine.vend"><code class="name flex">
 <span>def <span class="ident">vend</span></span>(<span>self, output_dir, locked_subdir, metadata_subdir, exclusions)</span>
 </code></dt>
@@ -241,42 +453,20 @@ class NftVendingMachine(object):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def vend(self, output_dir, locked_subdir, metadata_subdir, exclusions):
-    mint_reqs = self.cardano_cli.get_utxos(self.payment_addr, exclusions) 
+    if not self.__is_validated:
+        raise ValueError(&#39;Attempting to vend from non-validated vending machine&#39;)
+    mint_reqs = self.blockfrost_api.get_utxos(self.payment_addr, exclusions)
     for mint_req in mint_reqs:
-        available_mints = os.listdir(self.mint.nfts_dir)
-        if not available_mints:
-            print(&#34;Metadata directory is empty, please restock the vending machine...&#34;)
-            break
-
-        input_addr = self.blockfrost_api.get_input_address(mint_req.hash)
-        lovelace_bals = [balance for balance in mint_req.balances if balance.policy == Utxo.Balance.LOVELACE_POLICY]
-        if len(lovelace_bals) != 1:
-            raise ValueError(f&#34;Found too many/few lovelace balances for UTXO {mint_req}&#34;)
-
-        lovelace_bal = lovelace_bals.pop()
-        num_mints = min(len(available_mints), math.floor((lovelace_bal.lovelace - self.mint.rebate) / self.mint.price))
-        total_profit = num_mints * (self.mint.price - self.mint.donation) 
-        total_donation = num_mints * self.mint.donation
-        change = lovelace_bal.lovelace - (total_profit + total_donation)
-        print(f&#34;Beginning to mint {num_mints} NFTs to send to address {input_addr} (change: {change})&#34;)
-
         exclusions.add(mint_req)
-
-        txn_id = int(time.time())
-        nft_metadata_file = self.__lock_and_merge(available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id)
-        nft_names = self.__generate_nft_names_from(nft_metadata_file)
-        tx_ins = [f&#34;--tx-in {mint_req.hash}#{mint_req.ix}&#34;]
-        tx_outs = self.__get_tx_out_args(input_addr, change, nft_names, total_profit, total_donation)
-        mint_build_tmp = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, 0, nft_metadata_file, self.mint, nft_names)
-
-        tx_in_count = len(tx_ins)
-        tx_out_count = len([tx_out for tx_out in tx_outs if tx_out])
-        fee = self.cardano_cli.calculate_min_fee(mint_build_tmp, tx_in_count, tx_out_count, NftVendingMachine.__WITNESS_COUNT)
-
-        tx_outs = self.__get_tx_out_args(input_addr, change - fee, nft_names, total_profit, total_donation)
-        mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
-        mint_signed = self.cardano_cli.sign_txn([self.payment_sign_key, self.mint.sign_key], mint_build)
-        self.cardano_cli.submit_txn(mint_signed)</code></pre>
+        try:
+            self.__do_vend(mint_req, output_dir, locked_subdir, metadata_subdir)
+        except BadUtxoError as e:
+            print(f&#34;UNRECOVERABLE UTXO ERROR\n{e.utxo}\n^--- REQUIRES INVESTIGATION&#34;)
+            print(traceback.format_exc())
+        except Exception as e:
+            print(f&#34;WARNING: Uncaught exception for {mint_req}, not adding to exclusions (RETRY WILL BE ATTEMPTED)&#34;)
+            print(traceback.format_exc())
+            time.sleep(NftVendingMachine.__ERROR_WAIT)</code></pre>
 </details>
 </dd>
 </dl>
@@ -298,8 +488,13 @@ class NftVendingMachine(object):
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
+<h4><code><a title="cardano.wt.nft_vending_machine.BadUtxoError" href="#cardano.wt.nft_vending_machine.BadUtxoError">BadUtxoError</a></code></h4>
+</li>
+<li>
 <h4><code><a title="cardano.wt.nft_vending_machine.NftVendingMachine" href="#cardano.wt.nft_vending_machine.NftVendingMachine">NftVendingMachine</a></code></h4>
 <ul class="">
+<li><code><a title="cardano.wt.nft_vending_machine.NftVendingMachine.as_json" href="#cardano.wt.nft_vending_machine.NftVendingMachine.as_json">as_json</a></code></li>
+<li><code><a title="cardano.wt.nft_vending_machine.NftVendingMachine.validate" href="#cardano.wt.nft_vending_machine.NftVendingMachine.validate">validate</a></code></li>
 <li><code><a title="cardano.wt.nft_vending_machine.NftVendingMachine.vend" href="#cardano.wt.nft_vending_machine.NftVendingMachine.vend">vend</a></code></li>
 </ul>
 </li>
