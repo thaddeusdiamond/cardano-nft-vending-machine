@@ -84,7 +84,7 @@ class NftVendingMachine(object):
 
         utxo_inputs = self.blockfrost_api.get_inputs(mint_req.hash)
         utxo_outputs = self.blockfrost_api.get_outputs(mint_req.hash)
-        input_addrs = set([utxo_input['address'] for utxo_input in utxo_inputs])
+        input_addrs = set([utxo_input['address'] for utxo_input in utxo_inputs if not utxo_input['reference']])
         if len(input_addrs) < 1:
             raise BadUtxoError(mint_req, f"Txn hash {txn_hash} has no valid addresses ({utxo_inputs}), aborting...")
         input_addr = input_addrs.pop()
