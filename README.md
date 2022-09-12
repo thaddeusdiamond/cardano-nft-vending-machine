@@ -75,6 +75,48 @@ There is a sample vending machine script that is included in the ``src/`` direct
 This package is available from [PyPI](https://pypi.org/) and can be installed using ``pip3``.  Python <3.8 is currently unsupported at this time.
 
 	pip3 install cardano-nft-vending-machine
+### Scripts
+In the `scripts/` directory there are several scripts that can be used to help operationalize the vending machine.
+#### initialize_asset_wl.py
+This file should be used exactly once to initialize an asset-based whitelist for an existing NFT policy with *ALL* of the assets that are currently minted.  Note that the `CONSUMED_DIR` folder is created but left empty so that the vending machine (e.g., started with `main.py`) can use it during running.
+
+	usage: initialize_asset_wl.py [-h] --blockfrost-project BLOCKFROST_PROJECT --consumed-dir CONSUMED_DIR [--mainnet] --policy-id POLICY_ID [--preview] --whitelist-dir WHITELIST_DIR
+	Initialize an asset-based whitelist for an existing NFT policy
+	optional arguments:
+	-h, --help
+		show this help message and exit
+	--blockfrost-project BLOCKFROST_PROJECT
+		Blockfrost project ID to use for retrieving chain data
+	--consumed-dir CONSUMED_DIR
+		Local folder where consumed whitelist files will go after processing (MUST NOT YET EXIST)
+	--mainnet
+		Run the initializer against mainnet assets (default is False [preprod])
+	--policy-id POLICY_ID
+		Policy ID of the assets to be whitelisted
+	--preview
+		Run the initializer against preview assets (default is False [preprod])
+	--whitelist-dir WHITELIST_DIR
+		Local folder where whitelist files are stored (MUST NOT YET EXIST)
+
+#### upload_wl_usage.py
+
+This file should be run continuously during a whitelist mint to upload changes in the assets used for consumption by external parties.  Note that if there are any performance issues (e.g., IOPS throughput) with the local vending machine filesystem it is recommended you not use this file.  It is kept separate from the main vending machine operation to avoid any synchronization or performance issues as it is not critical.
+
+	usage: upload_wl_usage.py [-h] --old-wl-file OLD_WL_FILE --out-file OUT_FILE --whitelist-dir WHITELIST_DIR [--credentials CREDENTIALS] [--upload-method UPLOAD_METHOD]
+	Determine if a set of whitelist assets have been recently used in the vending machine
+	optional arguments:
+	-h, --help  show this help message and exit
+	--old-wl-file OLD_WL_FILE
+		Most recent run of this program that was uploaded to cloud storage
+	--out-file OUT_FILE
+		Where to store the new used whitelist information if any changes (can be same as --old-wl-file)
+	--whitelist-dir WHITELIST_DIR
+		Local folder where consumed whitelist files have gone after processing by vending machine
+	--credentials CREDENTIALS
+		JSON-formatted application-specific credentials
+	--upload-method UPLOAD_METHOD
+		Mechanism for uploading changes in whitelist files (e.g., CloudFlare)
+
 ## APIs
 All API documentation is auto-generated from ``pydoc3``-formatted multi-line strings in the source code.  A mirror of ``master`` is hosted on [Github Pages](https://thaddeusdiamond.github.io/cardano-nft-vending-machine/cardano/).
 ## Build

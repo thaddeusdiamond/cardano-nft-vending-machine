@@ -65,6 +65,14 @@ cardano-cli transaction policyid \
 # Create a directory to place your NFT metadata in (each one stored in JSON)
 mkdir metadata/
 
+# [OPTIONAL] Create a whitelist directory for any whitelists you will be running
+venv/bin/python3 cardano-nft-vending-machine/scripts/initialize_asset_wl.py \
+  --blockfrost-project $SET_YOUR_BLOCKFROST_PROJ_HERE \
+  --consumed-dir output/wl_consumed \
+  --policy-id $(cat policies/nftpolicyID) \
+  --whitelist-dir whitelist/ \
+  --mainnet
+
 # In one terminal, now run the cardano-nft-vending-machine code (backend)
 # NOTE: We recommend running this before copying any metadata over to ensure
 #       that if your address leaked there are no mints before the drop is live
@@ -90,3 +98,12 @@ venv/bin/python3 cardano-nft-vending-machine/main.py \
 # In a second terminal, when you are ready copy your metadata files into the
 # vending machine and your drop will be live!
 cp $SET_YOUR_METADATA_DIRECTORY/* metadata/
+
+# [OPTIONAL] In another terminal, launch a script to update Cloudflare or other
+#            service provider when the whitelist is used.
+venv/bin/python3 cardano-nft-vending-machine/scripts/upload_wl_usage.py \
+  --old-wl-file output/wl_upload_store/used_wl_assets.json \
+  --out-file output/wl_upload_store/used_wl_assets.json \
+  --whitelist-dir output/wl_consumed \
+  --upload-method cloudflare \
+  --credentials '{"project_name": "PROJECT_NAME", "account_id": "ACCOUNT_ID", "api_token": "API_TOKEN", "branch": "BRANCH"}'
