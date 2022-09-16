@@ -102,7 +102,7 @@ def get_mint_price(mint_price, free_mint):
     return 0 if free_mint else mint_price
 
 def get_parser():
-    parser = argparse.ArgumentParser(description='Run a vending machine for a specific NFT collection')
+    parser = argparse.ArgumentParser(add_help=False)
 
     price = parser.add_mutually_exclusive_group(required=True)
     price.add_argument('--mint-price', type=int, help='Price in LOVELACE that is being charged for each NFT (min 5₳)')
@@ -129,7 +129,11 @@ def get_parser():
     asset_whitelist.add_argument('--single-use-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have empty files where the filenames represent asset IDs on the whitelist.  Each asset can mint exactly 1 NFT')
     asset_whitelist.add_argument('--unlimited-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have empty files where the filenames represent asset IDs on the whitelist.  Each asset can mint unlimited NFTs')
 
-    return parser
+    cli_parser = argparse.ArgumentParser(description='A vending machine for a specific NFT collection')
+    subcommands = cli_parser.add_subparsers(title='subcommands', required=True, dest='command', description='valid subcommands', help='Options for the vending machine instantiation')
+    subcommands.add_parser('run', help='Run the vending machine with the specified configuration', parents=[parser])
+    subcommands.add_parser('validate', help='Only validate the vending machine with the specified configuration, do NOT run', parents=[parser])
+    return cli_parser
 
 if __name__ == "__main__":
     _args = get_parser().parse_args()
@@ -166,7 +170,12 @@ if __name__ == "__main__":
     print(f"Initialized vending machine with the following parameters")
     print(_nft_vending_machine.as_json())
 
-    exclusions = set()
-    while _program_is_running:
-        _nft_vending_machine.vend(_args.output_dir, LOCKED_SUBDIR, METADATA_SUBDIR, exclusions)
-        time.sleep(WAIT_TIMEOUT)
+    if _args.command == 'validate':
+        print('Successfully validated vending machine configuration!')
+    elif _args.command == 'run':
+        exclusions = set()
+        while _program_is_running:
+            _nft_vending_machine.vend(_args.output_dir, LOCKED_SUBDIR, METADATA_SUBDIR, exclusions)
+            time.sleep(WAIT_TIMEOUT)
+    else:
+        raise ValueError(f"Unknown vending machine subcommand: {_args.subparser_name}")

@@ -83,6 +83,7 @@ def test_cli_smoke(request, vm_test_config, blockfrost_api, cardano_cli):
     if get_preview_env():
         network_args.append('--preview')
     proc = launch_py3_subprocess('main.py', request, network_args + [
+        'run',
         '--payment-addr', payment.address,
         '--payment-sign-key', payment.keypair.skey_path,
         '--profit-addr', profit.address,

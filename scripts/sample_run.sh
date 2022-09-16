@@ -73,14 +73,36 @@ venv/bin/python3 cardano-nft-vending-machine/scripts/initialize_asset_wl.py \
   --whitelist-dir whitelist/ \
   --mainnet
 
-# In one terminal, now run the cardano-nft-vending-machine code (backend)
-# NOTE: We recommend running this before copying any metadata over to ensure
-#       that if your address leaked there are no mints before the drop is live
+# In a second terminal, when you are ready copy your metadata files into the
+# vending machine and your drop will be live!
+cp $SET_YOUR_METADATA_DIRECTORY/* metadata_staging/
+
+# In one terminal, now install the cardano-nft-vending-machine code (backend)
 git clone https://github.com/thaddeusdiamond/cardano-nft-vending-machine.git
 python3 -m venv venv
 venv/bin/pip3.8 install --upgrade pip
 venv/bin/pip3.8 install cardano-nft-vending-machine
-venv/bin/python3 cardano-nft-vending-machine/main.py \
+
+# FIRST: Validate your configuration to determine any metadata errors
+venv/bin/python3 cardano-nft-vending-machine/main.py validate \
+  --payment-addr $(cat keys/vending_machine.addr) \
+  --payment-sign-key keys/vending_machine.skey \
+  --profit-addr $(cat keys/profit_vault.addr) \
+  --mint-price $SET_YOUR_MINT_PRICE \
+  --mint-script policies/nftpolicy.script \
+  --mint-sign-key policies/nftpolicy.skey \
+  --mint-policy $(cat policies/nftpolicyID) \
+  --blockfrost-project $SET_YOUR_BLOCKFROST_PROJ_HERE \
+  --metadata-dir metadata_staging/ \
+  --output-dir output \
+  --single-vend-limit $SET_YOUR_SINGLE_VEND_MAX \
+  --vend-randomly \
+  --no-whitelist
+
+# SECOND: Fire up the vending machine to get it running!
+# NOTE: We recommend running this before copying any metadata over to ensure
+#       that if your address leaked there are no mints before the drop is live
+venv/bin/python3 cardano-nft-vending-machine/main.py run \
   --payment-addr $(cat keys/vending_machine.addr) \
   --payment-sign-key keys/vending_machine.skey \
   --profit-addr $(cat keys/profit_vault.addr) \
@@ -95,8 +117,8 @@ venv/bin/python3 cardano-nft-vending-machine/main.py \
   --vend-randomly \
   --no-whitelist
 
-# In a second terminal, when you are ready copy your metadata files into the
-# vending machine and your drop will be live!
+# THIRD: In a separate terminal, when you are ready copy your metadata files
+# into the vending machine and your drop will be live!
 cp $SET_YOUR_METADATA_DIRECTORY/* metadata/
 
 # [OPTIONAL] In another terminal, launch a script to update Cloudflare or other

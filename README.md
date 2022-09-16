@@ -54,7 +54,7 @@ The library consists of several Python objects representing the mint process.  T
 ### ``main.py``
 There is a sample vending machine script that is included in the ``src/`` directory to show how to invoke the library components.  Use ``-h`` to see detailed help or use a command like below:
 
-        python3 main.py \
+        python3 main.py [validate | run] \
                 --payment-addr <PAYMENT_ADDR> \
                 --payment-sign-key /FULL/PATH/TO/payment.skey \
                 --profit-addr <PROFIT_ADDR> \
