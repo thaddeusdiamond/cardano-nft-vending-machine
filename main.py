@@ -125,9 +125,8 @@ def get_parser():
 
     whitelist = parser.add_mutually_exclusive_group(required=True)
     whitelist.add_argument('--no-whitelist', action='store_true', help='No whitelist required for mints')
-    asset_whitelist = whitelist.add_mutually_exclusive_group()
-    asset_whitelist.add_argument('--single-use-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have empty files where the filenames represent asset IDs on the whitelist.  Each asset can mint exactly 1 NFT')
-    asset_whitelist.add_argument('--unlimited-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have empty files where the filenames represent asset IDs on the whitelist.  Each asset can mint unlimited NFTs')
+    whitelist.add_argument('--single-use-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have empty files where the filenames represent asset IDs on the whitelist.  Each asset can mint exactly 1 NFT')
+    whitelist.add_argument('--unlimited-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have empty files where the filenames represent asset IDs on the whitelist.  Each asset can mint unlimited NFTs')
 
     cli_parser = argparse.ArgumentParser(description='A vending machine for a specific NFT collection')
     subcommands = cli_parser.add_subparsers(title='subcommands', required=True, dest='command', description='valid subcommands', help='Options for the vending machine instantiation')

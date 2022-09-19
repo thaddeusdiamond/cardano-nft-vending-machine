@@ -63,7 +63,13 @@ cardano-cli transaction policyid \
   --script-file policies/nftpolicy.script > policies/nftpolicyID
 
 # Create a directory to place your NFT metadata in (each one stored in JSON)
-mkdir metadata/
+mkdir metadata/ metadata_staging/
+
+# In one terminal, now install the cardano-nft-vending-machine code (backend)
+git clone https://github.com/thaddeusdiamond/cardano-nft-vending-machine.git
+python3 -m venv venv
+venv/bin/pip3.8 install --upgrade pip
+venv/bin/pip3.8 install cardano-nft-vending-machine
 
 # [OPTIONAL] Create a whitelist directory for any whitelists you will be running
 venv/bin/python3 cardano-nft-vending-machine/scripts/initialize_asset_wl.py \
@@ -77,12 +83,6 @@ venv/bin/python3 cardano-nft-vending-machine/scripts/initialize_asset_wl.py \
 # vending machine and your drop will be live!
 cp $SET_YOUR_METADATA_DIRECTORY/* metadata_staging/
 
-# In one terminal, now install the cardano-nft-vending-machine code (backend)
-git clone https://github.com/thaddeusdiamond/cardano-nft-vending-machine.git
-python3 -m venv venv
-venv/bin/pip3.8 install --upgrade pip
-venv/bin/pip3.8 install cardano-nft-vending-machine
-
 # FIRST: Validate your configuration to determine any metadata errors
 venv/bin/python3 cardano-nft-vending-machine/main.py validate \
   --payment-addr $(cat keys/vending_machine.addr) \
@@ -95,7 +95,7 @@ venv/bin/python3 cardano-nft-vending-machine/main.py validate \
   --blockfrost-project $SET_YOUR_BLOCKFROST_PROJ_HERE \
   --metadata-dir metadata_staging/ \
   --output-dir output \
-  --single-vend-limit $SET_YOUR_SINGLE_VEND_MAX \
+  --single-vend-max $SET_YOUR_SINGLE_VEND_MAX \
   --vend-randomly \
   --no-whitelist
 
@@ -113,7 +113,7 @@ venv/bin/python3 cardano-nft-vending-machine/main.py run \
   --blockfrost-project $SET_YOUR_BLOCKFROST_PROJ_HERE \
   --metadata-dir metadata/ \
   --output-dir output \
-  --single-vend-limit $SET_YOUR_SINGLE_VEND_MAX \
+  --single-vend-max $SET_YOUR_SINGLE_VEND_MAX \
   --vend-randomly \
   --no-whitelist
 
