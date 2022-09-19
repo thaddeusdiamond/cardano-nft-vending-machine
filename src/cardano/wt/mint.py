@@ -61,7 +61,7 @@ class Mint(object):
         validated_names = []
         for filename in os.listdir(self.nfts_dir):
             with open(os.path.join(self.nfts_dir, filename), 'r') as file:
-                print(f"Validating {filename}")
+                print(f"Validating '{filename}'")
                 validated_nft = self.__validated_nft(json.load(file), validated_names, filename)
                 validated_names.append(validated_nft)
         self.validated_names = validated_names
@@ -90,6 +90,8 @@ class Mint(object):
         policy = sorted(list(nft_policy_obj.keys()))[0]
         if len(policy) != Mint._POLICY_LEN:
             raise ValueError(f"Incorrect looking policy {policy} in file '{filename}'")
+        if policy != self.policy:
+            raise ValueError(f"Encountered asset with policy {policy} different from vending machine start value {self.policy}")
         asset_obj = nft_policy_obj[policy]
         if len(asset_obj.keys()) != 1:
             raise ValueError(f"Incorrect # of assets ({len(asset_obj.keys())}) found in file '{filename}'")

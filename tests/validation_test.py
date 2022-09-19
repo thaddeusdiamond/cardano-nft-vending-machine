@@ -11,6 +11,8 @@ from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.utxo import Utxo
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
+TANGZ_POLICY = '33568ad11f93b3e79ae8dee5ad928ded72adcea719e92108caf1521b'
+
 def test_does_not_vend_without_validation():
     try:
         vending_machine = NftVendingMachine(None, None, None, False, sys.maxsize, None, None, None, mainnet=False)
@@ -65,7 +67,7 @@ def test_does_not_allow_donation_rebate_min_utxo_to_exceed_price(request, vm_tes
     sample_donation = 1000000
     try:
         simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-        mint = Mint(None, sample_price, sample_donation, vm_test_config.metadata_dir, simple_script, None, NoWhitelist())
+        mint = Mint(TANGZ_POLICY, sample_price, sample_donation, vm_test_config.metadata_dir, simple_script, None, NoWhitelist())
         for i in range(1, 30):
             filename = f"WildTangz {i}.json"
             data_file = data_file_path(request, os.path.join('smoketest', filename))
