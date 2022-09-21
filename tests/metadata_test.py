@@ -183,6 +183,17 @@ def test_rejects_nested_lengthy_metadata(request, vm_test_config):
     except ValueError as e:
         assert "Encountered metadata value >64 chars 'This is another really long explanation that should be detected" in str(e)
 
+def test_rejects_array_lengthy_metadata(request, vm_test_config):
+    simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
+    mint = Mint(TANGZ_POLICY, None, None, vm_test_config.metadata_dir, simple_script, None, NoWhitelist())
+    try:
+        bad_file = data_file_path(request, os.path.join('bad_format', 'array_lengthy_metadata.json'))
+        shutil.copy(bad_file, vm_test_config.metadata_dir)
+        mint.validate()
+        assert False, 'Successfully validated mint with nested lengthy metadata'
+    except ValueError as e:
+        assert "Encountered metadata value >64 chars 'This is an array really long explanation that should be detected" in str(e)
+
 def test_rejects_if_duplicate_names_in_dir(request, vm_test_config):
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
     mint = Mint(TANGZ_POLICY, None, None, vm_test_config.metadata_dir, simple_script, None, NoWhitelist())

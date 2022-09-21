@@ -72,6 +72,9 @@ class Mint(object):
         if type(metadata) is dict:
             for key, value in metadata.items():
                 self.__validate_str_lengths(value)
+        if type(metadata) is list:
+            for value in metadata:
+                self.__validate_str_lengths(value)
         if type(metadata) is str and len(metadata) > Mint._METADATA_MAXLEN:
             raise ValueError(f"Encountered metadata value >{Mint._METADATA_MAXLEN} chars '{metadata}'")
 
