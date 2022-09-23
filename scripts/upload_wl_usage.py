@@ -12,16 +12,19 @@ def upload_to_cloudflare(out_file, cloudflare_args):
     env_copy = os.environ.copy()
     env_copy['CLOUDFLARE_ACCOUNT_ID'] = cloudflare_args['account_id']
     env_copy['CLOUDFLARE_API_TOKEN'] = cloudflare_args['api_token']
-    subprocess.check_output([
-        'wrangler',
-        'pages',
-        'publish',
-        '--branch',
-        cloudflare_args['branch'],
-        '--project-name',
-        cloudflare_args['project_name'],
-        os.path.dirname(out_file)
-    ], env=env_copy).decode(sys.stdout.encoding).strip()
+    try:
+        subprocess.check_output([
+            'wrangler',
+            'pages',
+            'publish',
+            '--branch',
+            cloudflare_args['branch'],
+            '--project-name',
+            cloudflare_args['project_name'],
+            os.path.dirname(out_file)
+        ], env=env_copy).decode(sys.stdout.encoding).strip()
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError("'{}' returned with error (code {}): {}".format(e.cmd, e.returncode, e.output))
 
 def write_to_local(whitelist, out_file):
     with open(out_file, 'w') as whitelist_file:

@@ -68,8 +68,8 @@ mkdir metadata/ metadata_staging/
 # In one terminal, now install the cardano-nft-vending-machine code (backend)
 git clone https://github.com/thaddeusdiamond/cardano-nft-vending-machine.git
 python3 -m venv venv
-venv/bin/pip3.8 install --upgrade pip
-venv/bin/pip3.8 install cardano-nft-vending-machine
+venv/bin/pip3 install --upgrade pip
+venv/bin/pip3 install cardano-nft-vending-machine
 
 # [OPTIONAL] Create a whitelist directory for any whitelists you will be running
 venv/bin/python3 cardano-nft-vending-machine/scripts/initialize_asset_wl.py \
@@ -123,9 +123,13 @@ cp $SET_YOUR_METADATA_DIRECTORY/* metadata/
 
 # [OPTIONAL] In another terminal, launch a script to update Cloudflare or other
 #            service provider when the whitelist is used.
-venv/bin/python3 cardano-nft-vending-machine/scripts/upload_wl_usage.py \
-  --old-wl-file output/wl_upload_store/used_wl_assets.json \
-  --out-file output/wl_upload_store/used_wl_assets.json \
-  --whitelist-dir output/wl_consumed \
-  --upload-method cloudflare \
-  --credentials '{"project_name": "PROJECT_NAME", "account_id": "ACCOUNT_ID", "api_token": "API_TOKEN", "branch": "BRANCH"}'
+while true;
+do
+  venv/bin/python3 cardano-nft-vending-machine/scripts/upload_wl_usage.py \
+    --old-wl-file output/wl_upload_store/used_wl_assets.json \
+    --out-file output/wl_upload_store/used_wl_assets.json \
+    --whitelist-dir output/wl_consumed \
+    --upload-method cloudflare \
+    --credentials '{"project_name": "PROJECT_NAME", "account_id": "ACCOUNT_ID", "api_token": "API_TOKEN", "branch": "BRANCH"}';
+  sleep 30;
+done
