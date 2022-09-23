@@ -137,3 +137,4 @@ dmypy.json
 
 # Secrets for running integration tests
 tests/secrets
+private/

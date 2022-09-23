@@ -27,7 +27,7 @@ from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
 DONATION_AMT = 0
 EXPIRATION = 87654321
-SINGLE_VEND_MAX = 30
+SINGLE_VEND_MAX = 20
 VEND_RANDOMLY = True
 
 PADDING = 500000
@@ -45,6 +45,7 @@ def scale_params(request):
     request_opts = vars(request.config.option)
     required_params = [
         { "key": "available_assets", "cli": "--available-assets"},
+        { "key": "assets_dir", "cli": "--assets-dir"},
         { "key": "max_nfts", "cli": "--max-nfts"},
         { "key": "min_nfts", "cli": "--min-nfts"},
         { "key": "mint_price", "cli": "--mint-price"},
@@ -65,10 +66,50 @@ def get_normal_distribution(size):
 def test_concurrent_wallet_usage(request, vm_test_config, blockfrost_api, cardano_cli, scale_params):
     print(scale_params)
     available_assets = scale_params['available_assets']
+    assets_dir = scale_params['assets_dir']
     max_nfts = scale_params['max_nfts']
     min_nfts = scale_params['min_nfts']
     mint_price = scale_params['mint_price']
     num_wallets = scale_params['num_wallets']
+
+    ### LOAD METADATA
+    policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
+    policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+    asset_names = [f"{METADATA_FILE_PREFIX} {i}" for i in range(1, available_assets + 1)]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir, test_prefix=f"../../{assets_dir}")
+
+    ### VENDING MACHINE CONFIGURATION
+    payment = Address.new(
+            vm_test_config.payees_dir,
+            'payment',
+            get_network_magic()
+    )
+    mint = Mint(
+            policy.id,
+            mint_price,
+            DONATION_AMT,
+            vm_test_config.metadata_dir,
+            policy.script_file_path,
+            policy_keys.skey_path,
+            NoWhitelist()
+    )
+    profit = Address.new(
+            vm_test_config.payees_dir,
+            'profit',
+            get_network_magic()
+    )
+    nft_vending_machine = NftVendingMachine(
+            payment.address,
+            payment.keypair.skey_path,
+            profit.address,
+            VEND_RANDOMLY,
+            SINGLE_VEND_MAX,
+            mint,
+            blockfrost_api,
+            cardano_cli,
+            mainnet=get_mainnet_env()
+    )
+    nft_vending_machine.validate()
 
     ### INITIAL FUNDING TRANSACTIONS
     funder = get_funder_address(request)
@@ -110,41 +151,6 @@ def test_concurrent_wallet_usage(request, vm_test_config, blockfrost_api, cardan
     for idx in range(len(quantity_mapping)):
         print(f"{quantity_mapping[idx]} buyers will purchase {idx} NFTs")
 
-    ### VENDING MACHINE CONFIGURATION
-    payment = Address.new(
-            vm_test_config.payees_dir,
-            'payment',
-            get_network_magic()
-    )
-    policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
-    policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
-    mint = Mint(
-            policy.id,
-            mint_price,
-            DONATION_AMT,
-            vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
-            NoWhitelist()
-    )
-    profit = Address.new(
-            vm_test_config.payees_dir,
-            'profit',
-            get_network_magic()
-    )
-    nft_vending_machine = NftVendingMachine(
-            payment.address,
-            payment.keypair.skey_path,
-            profit.address,
-            VEND_RANDOMLY,
-            SINGLE_VEND_MAX,
-            mint,
-            blockfrost_api,
-            cardano_cli,
-            mainnet=get_mainnet_env()
-    )
-    nft_vending_machine.validate()
-
     ### SEND IN THE PAYMENTS
     for wallet in all_wallets:
         wallet_addr = wallet['buyer'].address
@@ -164,8 +170,6 @@ def test_concurrent_wallet_usage(request, vm_test_config, blockfrost_api, cardan
             await_payment(payment.address, payment_txn, blockfrost_api)
 
     ### DO THE VEND!
-    asset_names = [f"{METADATA_FILE_PREFIX} {i}" for i in range(1, available_assets + 1)]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir, test_prefix='scale')
     start_time = time.time()
     print(f">>> BEGINNING THE VEND ---> {datetime.datetime.now().isoformat()}")
     nft_vending_machine.vend(
@@ -241,19 +245,22 @@ def test_concurrent_wallet_usage(request, vm_test_config, blockfrost_api, cardan
                 additional_keys=drain_signers
         )
 
-    # TODO: This won't scale in the thousands
-    profit_utxos = blockfrost_api.get_utxos(profit.address, [])
-    drain_payment = sum([lovelace_in(profit_utxo) for profit_utxo in profit_utxos])
-    drain_txn = send_money(
-            [funder],
-            drain_payment,
-            profit,
-            profit_utxos,
-            cardano_cli,
-            blockfrost_api,
-            vm_test_config.root_dir
-    )
-    await_payment(funder.address, drain_txn, blockfrost_api)
+    all_profit_utxos = list(blockfrost_api.get_utxos(profit.address, []))
+    curr_idx = 0
+    while curr_idx < len(all_profit_utxos):
+        profit_utxos = all_profit_utxos[curr_idx:(curr_idx + 200)]
+        drain_payment = sum([lovelace_in(profit_utxo) for profit_utxo in profit_utxos])
+        drain_txn = send_money(
+                [funder],
+                drain_payment,
+                profit,
+                profit_utxos,
+                cardano_cli,
+                blockfrost_api,
+                vm_test_config.root_dir
+        )
+        await_payment(funder.address, drain_txn, blockfrost_api)
+        curr_idx += 200
 
 def test_do_the_drain(request, vm_test_config, blockfrost_api, cardano_cli, scale_params):
     print(scale_params)
@@ -315,17 +322,19 @@ def test_do_the_drain(request, vm_test_config, blockfrost_api, cardano_cli, scal
 
     profit_keypair = KeyPair.existing(old_test_dir, 'payees/profit')
     profit = Address.existing(profit_keypair, get_network_magic())
-    profit_utxos = blockfrost_api.get_utxos(profit.address, [])
-    if not profit_utxos:
-        return
-    drain_payment = sum([lovelace_in(profit_utxo) for profit_utxo in profit_utxos])
-    drain_txn = send_money(
-            [funder],
-            drain_payment,
-            profit,
-            profit_utxos,
-            cardano_cli,
-            blockfrost_api,
-            vm_test_config.root_dir
-    )
-    await_payment(funder.address, drain_txn, blockfrost_api)
+    all_profit_utxos = list(blockfrost_api.get_utxos(profit.address, []))
+    curr_idx = 0
+    while curr_idx < len(all_profit_utxos):
+        profit_utxos = all_profit_utxos[curr_idx:(curr_idx + 200)]
+        drain_payment = sum([lovelace_in(profit_utxo) for profit_utxo in profit_utxos])
+        drain_txn = send_money(
+                [funder],
+                drain_payment,
+                profit,
+                profit_utxos,
+                cardano_cli,
+                blockfrost_api,
+                vm_test_config.root_dir
+        )
+        await_payment(funder.address, drain_txn, blockfrost_api)
+        curr_idx += 200
