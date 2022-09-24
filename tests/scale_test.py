@@ -320,6 +320,25 @@ def test_do_the_drain(request, vm_test_config, blockfrost_api, cardano_cli, scal
                 additional_keys=drain_signers
         )
 
+    payment_keypair = KeyPair.existing(old_test_dir, 'payees/payment')
+    payment = Address.existing(payment_keypair, get_network_magic())
+    all_payment_utxos = list(blockfrost_api.get_utxos(payment.address, []))
+    curr_idx = 0
+    while curr_idx < len(all_payment_utxos):
+        payment_utxos = all_payment_utxos[curr_idx:(curr_idx + 200)]
+        drain_payment = sum([lovelace_in(payment_utxo) for payment_utxo in payment_utxos])
+        drain_txn = send_money(
+                [funder],
+                drain_payment,
+                payment,
+                payment_utxos,
+                cardano_cli,
+                blockfrost_api,
+                vm_test_config.root_dir
+        )
+        await_payment(funder.address, drain_txn, blockfrost_api)
+        curr_idx += 200
+
     profit_keypair = KeyPair.existing(old_test_dir, 'payees/profit')
     profit = Address.existing(profit_keypair, get_network_magic())
     all_profit_utxos = list(blockfrost_api.get_utxos(profit.address, []))
