@@ -1119,9 +1119,6 @@ def test_can_handle_multiple_input_addresses(request, vm_test_config, blockfrost
     await_payment(funder.address, burn_txn, blockfrost_api)
 
 def test_sends_asset_to_non_reference_input(request, vm_test_config, blockfrost_api, cardano_cli):
-    if not get_preview_env():
-        pytest.skip('Must run this test against the Preview (Vasil) environment to use reference inputs')
-
     buyer1 = Address.new(
             vm_test_config.buyers_dir,
             'buyer1',

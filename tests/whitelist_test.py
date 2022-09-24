@@ -349,9 +349,6 @@ def test_remains_on_whitelist_if_vendingmachine_empty(request, vm_test_config, b
 
 @pytest.mark.parametrize("WhitelistType", [SingleUseWhitelist, UnlimitedWhitelist])
 def test_rejects_if_asset_sent_as_reference_input(request, vm_test_config, blockfrost_api, cardano_cli, WhitelistType):
-    if not get_preview_env():
-        pytest.skip('Must run this test against the Preview (Vasil) environment to use reference inputs')
-
     buyer = Address.new(
             vm_test_config.buyers_dir,
             'buyer',
