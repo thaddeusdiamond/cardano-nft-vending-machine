@@ -18,7 +18,7 @@ class BlockfrostApi(object):
     _APPLICATION_JSON = 'application/json'
     _BACKOFF_SEC = 10
     _MAX_GET_RETRIES = 9
-    _MAX_POST_RETRIES = 3
+    _MAX_POST_RETRIES = 0
     _UTXO_LIST_LIMIT = 100
 
     def __init__(self, project, mainnet=False, preview=False, max_get_retries=_MAX_GET_RETRIES, max_post_retries=_MAX_POST_RETRIES):
