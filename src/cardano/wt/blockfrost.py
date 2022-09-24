@@ -17,49 +17,22 @@ class BlockfrostApi(object):
     _API_CALLS_PER_SEC = 10
     _APPLICATION_JSON = 'application/json'
     _BACKOFF_SEC = 10
-    _BURST_TXN_PER_SEC = 10
     _MAX_GET_RETRIES = 9
     _MAX_POST_RETRIES = 3
-    _MAX_BURST = 500
     _UTXO_LIST_LIMIT = 100
 
     def __init__(self, project, mainnet=False, preview=False, max_get_retries=_MAX_GET_RETRIES, max_post_retries=_MAX_POST_RETRIES):
         self.project = project
         self.mainnet = mainnet
         self.preview = preview
-        self.built_up_burst = BlockfrostApi._MAX_BURST
-        self.bursting = False
-        self.curr_sec = int(time.time())
-        self.curr_calls = 0
         self.max_get_retries = max_get_retries
         self.max_post_retries = max_post_retries
-
-    def __account_for_rate_limit(self):
-        this_time = time.time()
-        this_sec = int(this_time)
-        if self.curr_sec == this_sec:
-            self.curr_calls += 1
-        else:
-            if self.bursting:
-                self.built_up_burst = 0
-            else:
-                self.built_up_burst = min(BlockfrostApi._MAX_BURST, self.built_up_burst + BlockfrostApi._BURST_TXN_PER_SEC)
-            self.bursting = False
-            self.curr_sec = this_sec
-            self.curr_calls = 1
-        if self.curr_calls == BlockfrostApi._API_CALLS_PER_SEC:
-            print("Blockfrost API: ENTERING BURST, EXCEEDED ALLOWABLE API CALLS")
-            self.bursting = True
-        if self.bursting and (self.curr_calls > self.built_up_burst):
-            print("Blockfrost API: BEYOND BURST CAPABILITIES, MAY RESULT IN FATAL ERROR")
-            time.sleep(1.0  / BlockfrostApi._API_CALLS_PER_SEC)
 
     def __get_api_base(self):
         identifier = 'mainnet' if self.mainnet else 'preview' if self.preview else 'preprod'
         return f"https://cardano-{identifier}.blockfrost.io/api/v0"
 
     def __call_with_retries(self, call_func, max_retries):
-        self.__account_for_rate_limit()
         retries = 0
         while True:
             try:
