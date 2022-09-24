@@ -158,7 +158,7 @@ class NftVendingMachine(object):
                 print(f"UNRECOVERABLE UTXO ERROR\n{e.utxo}\n^--- REQUIRES INVESTIGATION")
                 print(traceback.format_exc())
             except Exception as e:
-                print(f"WARNING: Uncaught exception for {mint_req}, not adding to exclusions (RETRY WILL BE ATTEMPTED)")
+                print(f"WARNING: Uncaught exception for {mint_req}, added to exclusions (RETRY WILL NOT BE ATTEMPTED)")
                 print(traceback.format_exc())
                 time.sleep(NftVendingMachine.__ERROR_WAIT)
 
