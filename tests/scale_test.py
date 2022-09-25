@@ -259,7 +259,6 @@ def test_concurrent_wallet_usage(request, vm_test_config, blockfrost_api, cardan
                 blockfrost_api,
                 vm_test_config.root_dir
         )
-        await_payment(funder.address, drain_txn, blockfrost_api)
         curr_idx += 200
 
 def test_do_the_drain(request, vm_test_config, blockfrost_api, cardano_cli, scale_params):
@@ -336,7 +335,6 @@ def test_do_the_drain(request, vm_test_config, blockfrost_api, cardano_cli, scal
                 blockfrost_api,
                 vm_test_config.root_dir
         )
-        await_payment(funder.address, drain_txn, blockfrost_api)
         curr_idx += 200
 
     profit_keypair = KeyPair.existing(old_test_dir, 'payees/profit')
@@ -355,5 +353,4 @@ def test_do_the_drain(request, vm_test_config, blockfrost_api, cardano_cli, scal
                 blockfrost_api,
                 vm_test_config.root_dir
         )
-        await_payment(funder.address, drain_txn, blockfrost_api)
         curr_idx += 200
