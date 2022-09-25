@@ -82,14 +82,6 @@ class NftVendingMachine(object):
         elif self.vend_randomly:
             random.shuffle(available_mints)
 
-        utxos = self.blockfrost_api.get_tx_utxos(mint_req.hash)
-        utxo_inputs = utxos['inputs']
-        utxo_outputs = utxos['outputs']
-        input_addrs = set([utxo_input['address'] for utxo_input in utxo_inputs if not utxo_input['reference']])
-        if len(input_addrs) < 1:
-            raise BadUtxoError(mint_req, f"Txn hash {txn_hash} has no valid addresses ({utxo_inputs}), aborting...")
-        input_addr = input_addrs.pop()
-
         non_lovelace_bals = [balance for balance in mint_req.balances if balance.policy != Utxo.Balance.LOVELACE_POLICY]
         if non_lovelace_bals:
             raise BadUtxoError(mint_req, f"Cannot accept non-lovelace balances as payment")
@@ -100,6 +92,17 @@ class NftVendingMachine(object):
 
         lovelace_bal = lovelace_bals.pop()
         num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price) if self.mint.price else self.single_vend_max
+        if not num_mints_requested:
+            raise BadUtxoError(mint_req, f"User intentionally sent too little lovelace, avoiding txn processing to avoid DDoS")
+
+        utxos = self.blockfrost_api.get_tx_utxos(mint_req.hash)
+        utxo_inputs = utxos['inputs']
+        utxo_outputs = utxos['outputs']
+        input_addrs = set([utxo_input['address'] for utxo_input in utxo_inputs if not utxo_input['reference']])
+        if len(input_addrs) < 1:
+            raise BadUtxoError(mint_req, f"Txn hash {txn_hash} has no valid addresses ({utxo_inputs}), aborting...")
+        input_addr = input_addrs.pop()
+
         wl_availability = self.mint.whitelist.available(utxo_outputs)
         num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested, wl_availability)
 

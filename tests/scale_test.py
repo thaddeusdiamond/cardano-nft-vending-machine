@@ -183,16 +183,6 @@ def test_concurrent_wallet_usage(request, vm_test_config, blockfrost_api, cardan
     print(f">>> THE VEND IS COMPLETE ---> {datetime.datetime.now().isoformat()}")
     print(f"^------ Vend completed in {runtime:,.2f}s")
 
-    attempt = 0
-    while True:
-        attempt += 1
-        if not blockfrost_api.get_utxos(payment.address, []):
-            break
-        elif attempt > VEND_WAIT_ATTEMPTS_MAX:
-            assert False, 'Still found UTxOs at the vending machine address after max attempts'
-        else:
-            time.sleep(VEND_EXECUTION_WAIT)
-
     ### VALIDATE THAT THE VEND WAS DONE CORRECTLY
     created_assets = blockfrost_api.get_assets(policy.id)
     attempted_to_mint = sum([(idx * quantity_mapping[idx]) for idx in range(len(quantity_mapping))])
@@ -244,6 +234,22 @@ def test_concurrent_wallet_usage(request, vm_test_config, blockfrost_api, cardan
                 vm_test_config.root_dir,
                 additional_keys=drain_signers
         )
+
+    all_payment_utxos = list(blockfrost_api.get_utxos(payment.address, []))
+    curr_idx = 0
+    while curr_idx < len(all_payment_utxos):
+        payment_utxos = all_payment_utxos[curr_idx:(curr_idx + 200)]
+        drain_payment = sum([lovelace_in(payment_utxo) for payment_utxo in payment_utxos])
+        drain_txn = send_money(
+                [funder],
+                drain_payment,
+                payment,
+                payment_utxos,
+                cardano_cli,
+                blockfrost_api,
+                vm_test_config.root_dir
+        )
+        curr_idx += 200
 
     all_profit_utxos = list(blockfrost_api.get_utxos(profit.address, []))
     curr_idx = 0

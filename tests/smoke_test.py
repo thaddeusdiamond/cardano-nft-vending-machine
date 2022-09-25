@@ -779,7 +779,7 @@ def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api, car
 
     assert policy_is_empty(policy, blockfrost_api), f"Burned asset successfully but {policy.id} has remaining_assets"
 
-def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api, cardano_cli):
+def test_blacklists_too_little_correctly(request, vm_test_config, blockfrost_api, cardano_cli):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
@@ -851,16 +851,25 @@ def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api, c
     asset_name = 'WildTangz 1'
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
+    exclusions = set()
     nft_vending_machine.vend(
             vm_test_config.root_dir,
             vm_test_config.locked_dir,
             vm_test_config.txn_metadata_dir,
-            set()
+            exclusions
     )
+
+    assert payment_utxo in exclusions, f"Exclusions did not have {payment_utxo}"
 
     try:
         profit_utxo = await_payment(profit.address, None, blockfrost_api)
-        assert False, 'Found profit when only refund expected: {profit_utxo}'
+        assert False, 'Found profit when only blacklist expected: {profit_utxo}'
+    except ValueError:
+        pass
+
+    try:
+        buyer_utxo = await_payment(buyer.address, None, blockfrost_api)
+        assert False, 'Found profit when only blacklist expected: {buyer_utxo}'
     except ValueError:
         pass
 
@@ -870,13 +879,12 @@ def test_refunds_too_little_correctly(request, vm_test_config, blockfrost_api, c
     minted_asset = blockfrost_api.get_asset(f"{policy.id}{asset_name_hex(asset_name)}")
     assert not minted_asset, f"Somehow the test created {asset_name} in policy {policy.id}"
 
-    minter_utxo = await_payment(buyer.address, None, blockfrost_api)
-    drain_payment = lovelace_in(minter_utxo)
+    drain_payment = lovelace_in(payment_utxo)
     drain_txn = send_money(
             [funder],
             drain_payment,
-            buyer,
-            [minter_utxo],
+            payment,
+            [payment_utxo],
             cardano_cli,
             blockfrost_api,
             vm_test_config.root_dir
