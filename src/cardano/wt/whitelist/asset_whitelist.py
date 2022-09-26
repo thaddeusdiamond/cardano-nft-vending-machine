@@ -68,10 +68,10 @@ class SingleUseWhitelist(AssetWhitelist):
         """
         remaining_to_remove = num_mints
         for utxo_output in utxo_outputs:
-            if not remaining_to_remove:
-                break
             utxo_amounts = utxo_output['amount']
             for utxo_amount in utxo_amounts:
+                if not remaining_to_remove:
+                    return
                 asset_id = utxo_amount['unit']
                 if not self.is_whitelisted(asset_id):
                     continue
