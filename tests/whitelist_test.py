@@ -1447,3 +1447,181 @@ def test_mints_correct_number_for_unlimited_use(request, vm_test_config, blockfr
             blockfrost_api,
             vm_test_config.root_dir
     )
+
+def test_respects_single_vend_max_for_unlimited_use(request, vm_test_config, blockfrost_api, cardano_cli):
+    single_vend_cap = 3
+    buyer = Address.new(
+            vm_test_config.buyers_dir,
+            'buyer',
+            get_network_magic()
+    )
+
+    funder = get_funder_address(request)
+    funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
+    funding_inputs = find_min_utxos_for_txn(WL_REBATE, funding_utxos, funder.address)
+    wl_funding_request_txn = send_money(
+            [buyer],
+            WL_REBATE,
+            funder,
+            funding_inputs,
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+    wl_buyer_utxo = await_payment(buyer.address, wl_funding_request_txn, blockfrost_api)
+
+    wl_policy_keys = KeyPair.new(vm_test_config.policy_dir, 'wl_policy')
+    wl_policy = new_policy_for(wl_policy_keys, vm_test_config.policy_dir, 'wl_policy.script', expiration=WL_EXPIRATION)
+
+    wl_pass = "WildTangz WL 1"
+    wl_pass_onchain = f"{wl_policy.id}{asset_name_hex(wl_pass)}"
+    wl_selfpayment = lovelace_in(wl_buyer_utxo)
+    wl_txn = mint_assets([wl_pass], wl_policy, wl_policy_keys, WL_EXPIRATION, buyer, wl_selfpayment, buyer, [wl_buyer_utxo], cardano_cli, blockfrost_api, vm_test_config.root_dir)
+    wl_mint_utxo = await_payment(buyer.address, wl_txn, blockfrost_api)
+
+    initialize_asset_wl(vm_test_config.whitelist_dir, vm_test_config.consumed_dir, wl_policy, request, blockfrost_api)
+    whitelist = UnlimitedWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
+    assert whitelist.is_whitelisted(wl_pass_onchain), f"{wl_pass_onchain} should be on the whitelist"
+
+    funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
+    funding_amt = (MINT_PRICE * 5) + (PADDING * 5)
+    funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
+    funding_request_txn = send_money(
+            [buyer],
+            funding_amt,
+            funder,
+            funding_inputs,
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+    buyer_utxo = await_payment(buyer.address, funding_request_txn, blockfrost_api)
+
+    payment = Address.new(
+            vm_test_config.payees_dir,
+            'payment',
+            get_network_magic()
+    )
+    payment_amt = lovelace_in(buyer_utxo) + lovelace_in(wl_mint_utxo)
+    payment_txn = send_money(
+            [payment],
+            (MINT_PRICE * 5 + PADDING),
+            buyer,
+            [buyer_utxo, wl_mint_utxo],
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+    payment_utxo = await_payment(payment.address, payment_txn, blockfrost_api)
+    buyer_send_to_self_utxo = await_payment(buyer.address, payment_txn, blockfrost_api)
+
+    policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
+    policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+    mint = Mint(
+            policy.id,
+            MINT_PRICE,
+            DONATION_AMT,
+            vm_test_config.metadata_dir,
+            policy.script_file_path,
+            policy_keys.skey_path,
+            whitelist
+    )
+    profit = Address.new(
+            vm_test_config.payees_dir,
+            'profit',
+            get_network_magic()
+    )
+    nft_vending_machine = NftVendingMachine(
+            payment.address,
+            payment.keypair.skey_path,
+            profit.address,
+            VEND_RANDOMLY,
+            single_vend_cap,
+            mint,
+            blockfrost_api,
+            cardano_cli,
+            mainnet=get_mainnet_env()
+    )
+    nft_vending_machine.validate()
+
+    asset_names = ["WildTangz 1", "WildTangz 2", "WildTangz 3", "WildTangz 4", "WildTangz 5"]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
+    nft_vending_machine.vend(
+            vm_test_config.root_dir,
+            vm_test_config.locked_dir,
+            vm_test_config.txn_metadata_dir,
+            set()
+    )
+
+    assert whitelist.is_whitelisted(wl_pass_onchain), f"{wl_pass_onchain} should STILL be on the whitelist"
+
+    profit_utxo = await_payment(profit.address, None, blockfrost_api)
+    profit_txn = blockfrost_api.get_txn(profit_utxo.hash)
+    user_rebate = Mint.RebateCalculator.calculate_rebate_for(1, 3, 3 * len(asset_names[0]))
+    profit_expected = (3 * MINT_PRICE) - user_rebate - int(profit_txn['fees'])
+    profit_actual = lovelace_in(profit_utxo)
+    assert profit_actual == profit_expected, f"Expected {profit_expected}, but actual was {profit_actual}"
+
+    minted_utxo = await_payment(buyer.address, profit_utxo.hash, blockfrost_api)
+    created_assets = blockfrost_api.get_assets(policy.id)
+    assert len(created_assets) == 3, f"Test did not create 3 assets under {policy.id}: {created_assets}"
+    assert lovelace_in(minted_utxo) > (MINT_PRICE * 2), f"Buyer requested 5 but should only have gotten 3"
+
+    created_asset_names = []
+    for created_asset in created_assets:
+        minted_assetid = created_asset['asset']
+        asset_name = hex_to_asset_name(minted_assetid[56:])
+        created_asset_names.append(asset_name)
+        assert lovelace_in(minted_utxo, policy=policy, asset_name=asset_name) == 1, f"Buyer does not have {asset_name} in {minted_utxo}"
+        assert minted_assetid.startswith(policy.id), f"Minted asset {minted_assetid} does not belong to policy {policy.id}"
+        assert asset_name in asset_names, f"Minted asset {minted_assetid} does not have hex name {asset_name}"
+        assert int(created_asset['quantity']) == 1, f"{created_asset} should have quantity of 1, not {quantity}"
+
+    assert len(os.listdir(vm_test_config.metadata_dir)) == 2, "Should have two metadata files remaining to use after mint"
+
+    drain_payment = lovelace_in(profit_utxo)
+    drain_txn = send_money(
+            [funder],
+            drain_payment,
+            profit,
+            [profit_utxo],
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+    await_payment(funder.address, drain_txn, blockfrost_api)
+
+    burn_txn = burn_and_reclaim_tada(
+            created_asset_names,
+            policy,
+            policy_keys,
+            EXPIRATION,
+            funder,
+            lovelace_in(minted_utxo),
+            buyer,
+            [minted_utxo],
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+    await_payment(funder.address, burn_txn, blockfrost_api)
+
+    assert policy_is_empty(policy, blockfrost_api), f"Burned asset successfully but {policy.id} has remaining_assets"
+
+    wl_burn_txn = burn_and_reclaim_tada(
+            [wl_pass],
+            wl_policy,
+            wl_policy_keys,
+            WL_EXPIRATION,
+            funder,
+            lovelace_in(buyer_send_to_self_utxo),
+            buyer,
+            [buyer_send_to_self_utxo],
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+    await_payment(funder.address, wl_burn_txn, blockfrost_api)
