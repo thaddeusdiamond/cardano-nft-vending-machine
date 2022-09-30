@@ -1238,3 +1238,140 @@ def test_sends_asset_to_non_reference_input(request, vm_test_config, blockfrost_
             additional_keys=[buyer2.keypair, profit.keypair]
     )
     await_payment(funder.address, burn_txn, blockfrost_api)
+
+def test_processes_utxos_in_blockchain_order(request, vm_test_config, blockfrost_api, cardano_cli):
+    funder = get_funder_address(request)
+    funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
+    num_buyers = 5
+    funding_amt = MINT_PRICE + PADDING
+    funding_inputs = find_min_utxos_for_txn(funding_amt * num_buyers, funding_utxos, funder.address)
+
+    buyers = list()
+    for buyer_idx in range(num_buyers):
+        buyers.append(Address.new(
+                vm_test_config.buyers_dir,
+                f"buyer{buyer_idx}",
+                get_network_magic()
+        ))
+    funding_request_txn = send_money(
+            buyers,
+            funding_amt,
+            funder,
+            funding_inputs,
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+
+    payment = Address.new(
+            vm_test_config.payees_dir,
+            'payment',
+            get_network_magic()
+    )
+
+    for buyer_idx in range(num_buyers):
+        buyer = buyers[buyer_idx]
+        buyer_utxo = await_payment(buyer.address, funding_request_txn, blockfrost_api)
+        mint_payment = lovelace_in(buyer_utxo)
+        payment_txn = send_money(
+                [payment],
+                mint_payment,
+                buyer,
+                [buyer_utxo],
+                cardano_cli,
+                blockfrost_api,
+                vm_test_config.root_dir
+        )
+        payment_utxo = await_payment(payment.address, payment_txn, blockfrost_api)
+
+    policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
+    policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+    mint = Mint(
+            policy.id,
+            MINT_PRICE,
+            DONATION_AMT,
+            vm_test_config.metadata_dir,
+            policy.script_file_path,
+            policy_keys.skey_path,
+            NoWhitelist()
+    )
+    profit = Address.new(
+            vm_test_config.payees_dir,
+            'profit',
+            get_network_magic()
+    )
+    nft_vending_machine = NftVendingMachine(
+            payment.address,
+            payment.keypair.skey_path,
+            profit.address,
+            DONT_VEND_RANDOMLY,
+            SINGLE_VEND_MAX,
+            mint,
+            blockfrost_api,
+            cardano_cli,
+            mainnet=get_mainnet_env()
+    )
+    nft_vending_machine.validate()
+
+    asset_names = [f'WildTangz {serial}' for serial in range(1, num_buyers + 1)]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
+    nft_vending_machine.vend(
+            vm_test_config.root_dir,
+            vm_test_config.locked_dir,
+            vm_test_config.txn_metadata_dir,
+            set()
+    )
+
+    most_recent_buyer_txn_time = -1
+    most_recent_buyer_txn_index = -1
+    minted_utxos = []
+    for buyer_idx in range(num_buyers):
+        buyer = buyers[buyer_idx]
+        minted_utxo = await_payment(buyer.address, None, blockfrost_api)
+        minted_utxos.append(minted_utxo)
+        minted_txn = blockfrost_api.get_txn(minted_utxo.hash)
+        minted_txn_time = minted_txn['block_time']
+        minted_txn_index = minted_txn['index']
+        if minted_txn_time == most_recent_buyer_txn_time:
+            assert minted_txn_index > most_recent_buyer_txn_index, f"Mint transaction for buyer{buyer_idx} came in same block time but earlier index than prior"
+        else:
+            assert minted_txn_time > most_recent_buyer_txn_time, f"Mint transaction for buyer{buyer_idx} came in earlier block time than prior mint"
+        most_recent_buyer_txn_time = minted_txn_time
+        most_recent_buyer_txn_index = minted_txn_index
+
+    created_assets = blockfrost_api.get_assets(policy.id)
+    assert len(created_assets) == num_buyers, f"Test did not create {num_buyers} asset under {policy.id}: {created_assets}"
+
+    profit_utxos = blockfrost_api.get_utxos(profit.address, [])
+    drain_payment = sum([lovelace_in(profit_utxo) for profit_utxo in profit_utxos])
+    drain_txn = send_money(
+            [funder],
+            drain_payment,
+            profit,
+            profit_utxos,
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+    await_payment(funder.address, drain_txn, blockfrost_api)
+
+    burn_payment = sum([lovelace_in(minted_utxo) for minted_utxo in minted_utxos])
+    burn_txn = burn_and_reclaim_tada(
+            asset_names,
+            policy,
+            policy_keys,
+            EXPIRATION,
+            funder,
+            burn_payment,
+            [],
+            minted_utxos,
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir,
+            additional_keys=[buyer.keypair for buyer in buyers]
+    )
+    await_payment(funder.address, burn_txn, blockfrost_api)
+
+    assert policy_is_empty(policy, blockfrost_api), f"Burned asset successfully but {policy.id} has remaining_assets"

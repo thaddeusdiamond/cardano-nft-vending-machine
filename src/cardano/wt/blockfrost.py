@@ -108,16 +108,16 @@ class BlockfrostApi(object):
             raise e
 
     def get_utxos(self, address, exclusions):
-        available_utxos = set()
+        available_utxos = list()
         for utxo_data in self.__call_paginated_get_api(f"addresses/{address}/utxos"):
             #print('EXCLUSIONS\t', [f'{utxo.hash}#{utxo.ix}' for utxo in exclusions])
             for raw_utxo in utxo_data:
                 balances = [Utxo.Balance(int(balance['quantity']), balance['unit']) for balance in raw_utxo['amount']]
                 utxo = Utxo(raw_utxo['tx_hash'], raw_utxo['output_index'], balances)
-                if utxo in exclusions:
+                if utxo in exclusions or utxo in available_utxos:
                     print(f'Skipping {utxo.hash}#{utxo.ix}')
                     continue
-                available_utxos.add(utxo)
+                available_utxos.append(utxo)
         return available_utxos
 
     def get_protocol_parameters(self):
