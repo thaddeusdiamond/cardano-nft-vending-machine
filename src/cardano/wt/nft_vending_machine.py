@@ -43,9 +43,9 @@ class NftVendingMachine(object):
 
     def __get_tx_out_args(self, input_addr, change, nft_names, total_profit, total_donation):
         user_tokens = filter(None, [input_addr, str(change), CardanoCli.named_asset_str(self.mint.policy, nft_names)])
-        user_output = f"--tx-out '{'+'.join(user_tokens)}'"
-        profit_output = f"--tx-out '{self.profit_addr}+{total_profit}'" if total_profit else ''
-        donation_output = f"--tx-out '{self.donation_addr}+{total_donation}'" if total_donation else ''
+        user_output = f"--tx-out \"{'+'.join(user_tokens)}\""
+        profit_output = f"--tx-out \"{self.profit_addr}+{total_profit}\"" if total_profit else ''
+        donation_output = f"--tx-out \"{self.donation_addr}+{total_donation}\"" if total_donation else ''
         return [user_output, profit_output, donation_output]
 
     def __generate_nft_names_from(self, metadata_file):
