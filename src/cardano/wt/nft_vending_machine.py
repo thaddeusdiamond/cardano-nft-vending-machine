@@ -103,7 +103,8 @@ class NftVendingMachine(object):
             raise BadUtxoError(mint_req, f"Txn hash {txn_hash} has no valid addresses ({utxo_inputs}), aborting...")
         input_addr = input_addrs.pop()
 
-        wl_availability = self.mint.whitelist.available(utxo_outputs)
+        wl_resources = self.mint.whitelist.required_info(mint_req, utxos, self.blockfrost_api)
+        wl_availability = self.mint.whitelist.available(wl_resources)
         num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested, wl_availability)
 
         if not self.mint.price and self.max_rebate > lovelace_bal.lovelace:
@@ -146,7 +147,7 @@ class NftVendingMachine(object):
         tx_outs = self.__get_tx_out_args(input_addr, final_change, nft_names, net_profit, self.mint.donation)
         mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
         mint_signed = self.cardano_cli.sign_txn(signers, mint_build)
-        self.mint.whitelist.consume(utxo_outputs, num_mints)
+        self.mint.whitelist.consume(wl_resources, num_mints)
         self.blockfrost_api.submit_txn(mint_signed)
 
     def vend(self, output_dir, locked_subdir, metadata_subdir, exclusions):
