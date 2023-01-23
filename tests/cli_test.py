@@ -17,7 +17,6 @@ from cardano.wt.mint import Mint
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
-DONATION_AMT = 0
 EXPIRATION = 87654321
 MINT_PRICE = 10000000
 SINGLE_VEND_MAX = 10

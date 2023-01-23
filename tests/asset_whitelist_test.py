@@ -18,7 +18,8 @@ from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.asset_whitelist import SingleUseWhitelist, UnlimitedWhitelist
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
-DONATION_AMT = 0
+DEV_FEE_ADDR = None
+DEV_FEE_AMT = 0
 EXPIRATION = 87654321
 MINT_PRICE = 10000000
 SINGLE_VEND_MAX = 10
@@ -40,12 +41,13 @@ def initialize_asset_wl(whitelist_dir, consumed_dir, wl_policy, request, blockfr
         wl_initializer_args.append('--preview')
     if get_mainnet_env():
         wl_initializer_args.append('--mainnet')
+    print(f"scripts/initialize_asset_wl.py {request} {' '.join(wl_initializer_args)}")
     launch_py3_subprocess(os.path.join('scripts', 'initialize_asset_wl.py'), request, wl_initializer_args).wait()
 
 def test_validate_requires_whitelist_dir_created(request, vm_test_config):
     whitelist = SingleUseWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(None, MINT_PRICE, DONATION_AMT, vm_test_config.metadata_dir, simple_script, None, whitelist)
+    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, simple_script, None, whitelist)
     try:
         mint.validate()
         assert False, "Successfully validated mint without a whitelist directory"
@@ -56,7 +58,7 @@ def test_validate_requires_consumed_dir_created(request, vm_test_config):
     os.mkdir(vm_test_config.whitelist_dir)
     whitelist = SingleUseWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(None, MINT_PRICE, DONATION_AMT, vm_test_config.metadata_dir, simple_script, None, whitelist)
+    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, simple_script, None, whitelist)
     try:
         mint.validate()
         assert False, "Successfully validated mint without a whitelist directory"
@@ -139,7 +141,8 @@ def test_rejects_if_no_asset_sent_to_self(request, vm_test_config, blockfrost_ap
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -286,7 +289,8 @@ def test_remains_on_whitelist_if_vendingmachine_empty(request, vm_test_config, b
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -421,7 +425,8 @@ def test_rejects_if_asset_sent_as_reference_input(request, vm_test_config, block
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -555,7 +560,8 @@ def test_excludes_if_asset_sent_directly(request, vm_test_config, blockfrost_api
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -690,7 +696,8 @@ def test_mints_correct_number_for_single_use(request, vm_test_config, blockfrost
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -905,7 +912,8 @@ def test_mints_correct_number_for_multiple_passes(request, vm_test_config, block
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -1112,7 +1120,8 @@ def test_mints_correct_number_with_same_utxo(request, vm_test_config, blockfrost
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -1311,7 +1320,8 @@ def test_mints_correct_number_for_unlimited_use(request, vm_test_config, blockfr
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -1522,7 +1532,8 @@ def test_respects_single_vend_max_for_unlimited_use(request, vm_test_config, blo
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,

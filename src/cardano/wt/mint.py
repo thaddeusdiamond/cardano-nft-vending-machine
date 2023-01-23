@@ -41,10 +41,11 @@ class Mint(object):
                     return validator[key]
         return None
 
-    def __init__(self, policy, price, donation, nfts_dir, script, sign_key, whitelist):
+    def __init__(self, policy, price, dev_fee, dev_addr, nfts_dir, script, sign_key, whitelist):
         self.policy = policy
         self.price = price
-        self.donation = donation
+        self.dev_fee = dev_fee
+        self.dev_addr = dev_addr
         self.nfts_dir = nfts_dir
         self.script = script
         self.sign_key = sign_key
@@ -54,8 +55,10 @@ class Mint(object):
         self.expiration_slot = Mint.__read_validator('before', 'slot', script)
 
     def validate(self):
-        if self.donation and self.donation < Utxo.MIN_UTXO_VALUE:
-            raise ValueError(f"Thank you for offering to donate {self.donation} but the minUTxO on Cardano is {Utxo.MIN_UTXO_VALUE} lovelace")
+        if self.dev_fee and self.dev_fee < Utxo.MIN_UTXO_VALUE:
+            raise ValueError(f"Thank you for offering to pay your dev {self.dev_fee} but the minUTxO on Cardano is {Utxo.MIN_UTXO_VALUE} lovelace")
+        if self.dev_fee and not self.dev_addr:
+            raise ValueError(f"Thank you for offering to pay your dev {self.dev_fee} but you did not provide a dev address")
         if self.price and self.price < Mint._MIN_PRICE:
             raise ValueError(f"Minimum mint price is {Mint._MIN_PRICE}, you entered {self.price}")
         validated_names = []

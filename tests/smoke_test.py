@@ -20,7 +20,8 @@ from cardano.wt.mint import Mint
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
-DONATION_AMT = 0
+DEV_FEE_ADDR = None
+DEV_FEE_AMT = 0
 EXPIRATION = 87654321
 MINT_PRICE = 10 * 1000000
 PADDING = 500000
@@ -38,7 +39,8 @@ def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api, 
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -123,7 +125,8 @@ def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api, cardano_
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -213,7 +216,8 @@ def test_blacklists_min_utxo_errors(request, vm_test_config, blockfrost_api, car
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -300,7 +304,8 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api, cardano_cli
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -417,7 +422,8 @@ def test_mints_restocked_nfts(request, vm_test_config, blockfrost_api, cardano_c
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -568,7 +574,8 @@ def test_mints_multiple_assets(request, vm_test_config, blockfrost_api, cardano_
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -704,7 +711,8 @@ def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api, car
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -824,7 +832,8 @@ def test_blacklists_too_little_correctly(request, vm_test_config, blockfrost_api
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -936,7 +945,8 @@ def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api, ca
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -1041,7 +1051,8 @@ def test_can_handle_multiple_input_addresses(request, vm_test_config, blockfrost
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -1177,7 +1188,8 @@ def test_sends_asset_to_non_reference_input(request, vm_test_config, blockfrost_
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,
@@ -1290,7 +1302,8 @@ def test_processes_utxos_in_blockchain_order(request, vm_test_config, blockfrost
     mint = Mint(
             policy.id,
             MINT_PRICE,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,

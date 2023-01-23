@@ -24,11 +24,6 @@ class NftVendingMachine(object):
     def as_json(self):
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
-    def _get_donation_addr(mainnet):
-        if mainnet:
-            return 'addr1qx2skanhkpgdhcyxnczydg3meqcv87z4vep7u2drrr6277v5entql0xseq6a4zs8j524wvwv6k46kpf8pt9ejjk6l9gs4g94mf'
-        return 'addr_test1vrce7uwk8vcva5j4dmehrxprwy57x20yaz9cv9vqzjutnnsrgrfey'
-
     def __init__(self, payment_addr, payment_sign_key, profit_addr, vend_randomly, single_vend_max, mint, blockfrost_api, cardano_cli, mainnet=False):
         self.payment_addr = payment_addr
         self.payment_sign_key = payment_sign_key
@@ -38,15 +33,14 @@ class NftVendingMachine(object):
         self.mint = mint
         self.blockfrost_api = blockfrost_api
         self.cardano_cli = cardano_cli
-        self.donation_addr = NftVendingMachine._get_donation_addr(mainnet)
         self.__is_validated = False
 
-    def __get_tx_out_args(self, input_addr, change, nft_names, total_profit, total_donation):
+    def __get_tx_out_args(self, input_addr, change, nft_names, total_profit, total_dev_fee):
         user_tokens = filter(None, [input_addr, str(change), CardanoCli.named_asset_str(self.mint.policy, nft_names)])
         user_output = f"--tx-out \"{'+'.join(user_tokens)}\""
         profit_output = f"--tx-out \"{self.profit_addr}+{total_profit}\"" if total_profit else ''
-        donation_output = f"--tx-out \"{self.donation_addr}+{total_donation}\"" if total_donation else ''
-        return [user_output, profit_output, donation_output]
+        dev_output = f"--tx-out \"{self.mint.dev_addr}+{total_dev_fee}\"" if total_dev_fee else ''
+        return [user_output, profit_output, dev_output]
 
     def __generate_nft_names_from(self, metadata_file):
         with open(metadata_file, 'r') as metadata_filehandle:
@@ -121,11 +115,12 @@ class NftVendingMachine(object):
 
         total_name_chars = sum([len(name) for name in self.__get_nft_names_from(nft_metadata_file)])
         user_rebate = Mint.RebateCalculator.calculate_rebate_for(NftVendingMachine.__SINGLE_POLICY, num_mints, total_name_chars) if self.mint.price else 0
-        net_profit = gross_profit - self.mint.donation - user_rebate
+        dev_fee = num_mints * self.mint.dev_fee
+        net_profit = gross_profit - dev_fee - user_rebate
         print(f"Minimum rebate to user is {user_rebate}, net profit to vault is {net_profit}")
 
         tx_ins = [f"--tx-in {mint_req.hash}#{mint_req.ix}"]
-        tx_outs = self.__get_tx_out_args(input_addr, user_rebate + change, nft_names, net_profit, self.mint.donation)
+        tx_outs = self.__get_tx_out_args(input_addr, user_rebate + change, nft_names, net_profit, dev_fee)
         mint_build_tmp = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, 0, nft_metadata_file, self.mint, nft_names)
 
         tx_in_count = len(tx_ins)
@@ -144,7 +139,7 @@ class NftVendingMachine(object):
         if (final_change and (final_change < Utxo.MIN_UTXO_VALUE)) or (net_profit and (net_profit < Utxo.MIN_UTXO_VALUE)):
             raise BadUtxoError(mint_req, f"UTxO left change of {change}, and net_profit of {net_profit}, causing a minUTxO error")
 
-        tx_outs = self.__get_tx_out_args(input_addr, final_change, nft_names, net_profit, self.mint.donation)
+        tx_outs = self.__get_tx_out_args(input_addr, final_change, nft_names, net_profit, dev_fee)
         mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_names)
         mint_signed = self.cardano_cli.sign_txn(signers, mint_build)
         self.mint.whitelist.consume(wl_resources, num_mints)
@@ -171,8 +166,8 @@ class NftVendingMachine(object):
             raise ValueError(f"Payment address and profit address ({self.payment_addr}) cannot be the same!")
         self.mint.validate()
         self.max_rebate = self.__max_rebate_for(self.mint.validated_names)
-        if self.mint.price and self.mint.price < (self.max_rebate + self.mint.donation + Utxo.MIN_UTXO_VALUE):
-            raise ValueError(f"Price of {self.mint.price} with donation of {self.mint.donation} could lead to a minUTxO error due to rebates")
+        if self.mint.price and self.mint.price < (self.max_rebate + self.mint.dev_fee + Utxo.MIN_UTXO_VALUE):
+            raise ValueError(f"Price of {self.mint.price} with dev fee of {self.mint.dev_fee} could lead to a minUTxO error due to rebates")
         self.__is_validated = True
 
     def __max_rebate_for(self, nft_names):

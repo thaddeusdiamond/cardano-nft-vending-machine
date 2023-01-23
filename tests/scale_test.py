@@ -25,7 +25,8 @@ from cardano.wt.utxo import Utxo
 from cardano.wt.whitelist.asset_whitelist import SingleUseWhitelist, UnlimitedWhitelist
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
-DONATION_AMT = 0
+DEV_FEE_ADDR = None
+DEV_FEE_AMT = 0
 EXPIRATION = 87654321
 SINGLE_VEND_MAX = 20
 VEND_RANDOMLY = True
@@ -87,7 +88,8 @@ def test_concurrent_wallet_usage(request, vm_test_config, blockfrost_api, cardan
     mint = Mint(
             policy.id,
             mint_price,
-            DONATION_AMT,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
             policy.script_file_path,
             policy_keys.skey_path,

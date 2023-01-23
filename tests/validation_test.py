@@ -45,29 +45,29 @@ def test_cascades_validation_to_mint():
 def test_does_not_allow_prices_below_threshold_unless_free(request):
     try:
         simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-        mint = Mint(None, 4999999, None, None, simple_script, None, None)
+        mint = Mint(None, 4999999, None, None, None, simple_script, None, None)
         vending_machine = NftVendingMachine('addr123', None, 'addr456', False, sys.maxsize, mint, None, None, mainnet=False)
         vending_machine.validate()
         assert False, "Successfully validated vending machine with price below threshold of 5₳"
     except ValueError as e:
         assert '4999999' in str(e)
 
-def test_does_not_allow_donation_below_min_utxo(request):
+def test_does_not_allow_dev_fee_below_min_utxo(request):
     try:
         simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-        mint = Mint(None, 4999999, Utxo.MIN_UTXO_VALUE - 1, None, simple_script, None, None)
+        mint = Mint(None, 4999999, Utxo.MIN_UTXO_VALUE - 1,  None, None, simple_script, None, None)
         vending_machine = NftVendingMachine('addr123', None, 'addr456', False, sys.maxsize, mint, None, None, mainnet=False)
         vending_machine.validate()
         assert False, "Successfully validated vending machine with donation below threshold of 1₳"
     except ValueError as e:
         assert f"{Utxo.MIN_UTXO_VALUE - 1}" in str(e)
 
-def test_does_not_allow_donation_rebate_min_utxo_to_exceed_price(request, vm_test_config):
+def test_does_not_allow_dev_fee_rebate_min_utxo_to_exceed_price(request, vm_test_config):
     sample_price = 5000000
     sample_donation = 1000000
     try:
         simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-        mint = Mint(TANGZ_POLICY, sample_price, sample_donation, vm_test_config.metadata_dir, simple_script, None, NoWhitelist())
+        mint = Mint(TANGZ_POLICY, sample_price, sample_donation, 'addr123', vm_test_config.metadata_dir, simple_script, None, NoWhitelist())
         for i in range(1, 30):
             filename = f"WildTangz {i}.json"
             data_file = data_file_path(request, os.path.join('smoketest', filename))
@@ -79,4 +79,4 @@ def test_does_not_allow_donation_rebate_min_utxo_to_exceed_price(request, vm_tes
         vending_machine.validate()
         assert False, 'Successfully validated mint with overlapping asset names'
     except ValueError as e:
-        assert f"Price of {sample_price} with donation of {sample_donation} could lead to a minUTxO error due to rebates" in str(e)
+        assert f"Price of {sample_price} with dev fee of {sample_donation} could lead to a minUTxO error due to rebates" in str(e)

@@ -94,9 +94,6 @@ def get_whitelist_type(args, wl_output_dir):
     if args.unlimited_asset_whitelist:
         return UnlimitedWhitelist(args.unlimited_asset_whitelist, wl_output_dir)
 
-def get_donation_amt(donate, free_mint):
-    return 0 if ((not donate) or free_mint) else 1000000
-
 def get_mint_price(mint_price, free_mint):
     assert(not (free_mint and mint_price))
     return 0 if free_mint else mint_price
@@ -121,7 +118,8 @@ def get_parser():
     parser.add_argument('--preview', action='store_true', help='Run the vending machine on the preview network (default is False [preprod])')
     parser.add_argument('--single-vend-max', type=int, required=True, help='Backend limit enforced on NFTs vended at once')
     parser.add_argument('--vend-randomly', action='store_true', help='Randomly pick from the metadata directory (using seed 321) when listing')
-    parser.add_argument('--donation', action='store_true', help='Send a 1₳ donation per txn to the dev (no worries!)')
+    parser.add_argument('--dev-fee', type=int, required=False, help='Developer fee (in lovelace, 1/1,000,000 ₳)')
+    parser.add_argument('--dev-addr', type=str, required=False, help='Address of developer wallet to send fee to')
 
     whitelist = parser.add_mutually_exclusive_group(required=True)
     whitelist.add_argument('--no-whitelist', action='store_true', help='No whitelist required for mints')
@@ -142,9 +140,9 @@ if __name__ == "__main__":
     ensure_output_dirs_made(_args.output_dir)
 
     _mint_price = get_mint_price(_args.mint_price, _args.free_mint)
-    _donation_amt = get_donation_amt(_args.donation, _args.free_mint)
     _whitelist = get_whitelist_type(_args, os.path.join(_args.output_dir, WL_CONSUMED_DIR_SUBDIR))
-    _mint = Mint(_args.mint_policy, _mint_price, _donation_amt, _args.metadata_dir, _args.mint_script, _args.mint_sign_key, _whitelist)
+    _dev_fee = _args.dev_fee if _args.dev_fee else 0
+    _mint = Mint(_args.mint_policy, _mint_price, _dev_fee, _args.dev_addr, _args.metadata_dir, _args.mint_script, _args.mint_sign_key, _whitelist)
 
     _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet, preview=_args.preview)
 
