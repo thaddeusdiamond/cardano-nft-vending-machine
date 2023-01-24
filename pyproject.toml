@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cardano-nft-vending-machine"
-version = "0.5.3"
+version = "0.6.0"
 
 description = "Library to perform NFT mints automatically on the Cardano blockchain"
 readme = "README.md"
@@ -19,7 +19,8 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
   "Deprecated>=1.2.13",
-  "requests>=2.27.1"
+  "requests>=2.27.1",
+  "pycardano>=0.7.2"
 ]
 
 [project.urls]
@@ -27,9 +28,9 @@ Documentation = "https://thaddeusdiamond.github.io/cardano-nft-vending-machine/c
 Source = "https://github.com/thaddeusdiamond/cardano-nft-vending-machine"
 
 [tool.setuptools.packages.find]
-where = ["src"] 
-include = ["cardano*"] 
-exclude = ["cardano.tests*"] 
+where = ["src"]
+include = ["cardano*"]
+exclude = ["cardano.tests*"]
 namespaces = false
 
 [tool.pytest.ini_options]
