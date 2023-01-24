@@ -1,3 +1,5 @@
+import json
+import os
 import pytest
 import time
 
@@ -117,7 +119,7 @@ def policy_is_empty(policy, blockfrost_api):
         time.sleep(BURN_WAIT)
     return False
 
-def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_keys=[], additional_outputs='', ref_inputs=[], burned=[], era='--alonzo-era'):
+def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, additional_args=[], additional_keys=[], additional_outputs='', ref_inputs=[], burned=[], era='--alonzo-era', metadata=None):
     txn_id = int(time.time())
     tx_in_args = [f"--tx-in {utxo.hash}#{utxo.ix}" for utxo in utxo_inputs]
     remainder = calculate_remainder_str(requested, len(receivers), utxo_inputs, burned, additional_outputs)
@@ -134,13 +136,19 @@ def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfros
     additional_args_clone = additional_args.copy()
     additional_args_clone += [f"--read-only-tx-in-reference {ref_input.hash}#{ref_input.ix}" for ref_input in ref_inputs]
 
+    metadata_file = None
+    if metadata:
+        metadata_file = os.path.join(output_dir, CardanoCli.TXN_DIR, f"{txn_id}.json")
+        with open(metadata_file, 'w') as metadata_handle:
+            json.dump(metadata, metadata_handle)
+
     raw_build_file = cardano_cli.build_raw_txn(
         output_dir,
         txn_id,
         tx_in_args,
         tx_out_args,
         0,
-        None,
+        metadata_file,
         additional_args_clone,
         era=era
     )
@@ -166,7 +174,7 @@ def send_money(receivers, requested, sender, utxo_inputs, cardano_cli, blockfros
         tx_in_args,
         tx_out_args,
         min_fee,
-        None,
+        metadata_file,
         additional_args_clone,
         era=era
     )

@@ -107,6 +107,9 @@ class BlockfrostApi(object):
                 return None
             raise e
 
+    def get_metadata(self, txn_hash):
+        return self.__call_get_api(f"txs/{txn_hash}/metadata")
+
     def get_utxos(self, address, exclusions):
         available_utxos = list()
         for utxo_data in self.__call_paginated_get_api(f"addresses/{address}/utxos"):

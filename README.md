@@ -68,7 +68,9 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 --single-vend-max <MAX_SINGLE_VEND> \
                 [--vend-randomly] \
                 [--no-whitelist | \
-                  [--single-use-asset-whitelist <WHITELIST_DIR> | --unlimited-asset-whitelist <WHITELIST_DIR>]] \
+                  [--single-use-asset-whitelist <WHITELIST_DIR> \
+                    | --unlimited-asset-whitelist <WHITELIST_DIR> \
+                    | --wallet-whitelist <WHITELIST_DIR> <NUM_ITEMS_PER_USER> ] \
                 [--dev-fee dev_fee --dev-addr dev_addr] \
                 [--mainnet]
 ## Installation

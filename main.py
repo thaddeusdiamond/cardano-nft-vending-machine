@@ -14,6 +14,7 @@ from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.utxo import Utxo
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 from cardano.wt.whitelist.asset_whitelist import SingleUseWhitelist, UnlimitedWhitelist
+from cardano.wt.whitelist.wallet_whitelist import WalletWhitelist
 
 # Blockfrost gives the wrong format back for protocol parameters so here's a translator
 BLOCKFROST_PROTOCOL_TRANSLATOR = {
@@ -93,6 +94,8 @@ def get_whitelist_type(args, wl_output_dir):
         return SingleUseWhitelist(args.single_use_asset_whitelist, wl_output_dir)
     if args.unlimited_asset_whitelist:
         return UnlimitedWhitelist(args.unlimited_asset_whitelist, wl_output_dir)
+    if args.wallet_whitelist:
+        return WalletWhitelist(args.wallet_whitelist[0], wl_output_dir, int(args.wallet_whitelist[1]))
 
 def get_mint_price(mint_price, free_mint):
     assert(not (free_mint and mint_price))
@@ -125,6 +128,7 @@ def get_parser():
     whitelist.add_argument('--no-whitelist', action='store_true', help='No whitelist required for mints')
     whitelist.add_argument('--single-use-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have empty files where the filenames represent asset IDs on the whitelist.  Each asset can mint exactly 1 NFT')
     whitelist.add_argument('--unlimited-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have empty files where the filenames represent asset IDs on the whitelist.  Each asset can mint unlimited NFTs')
+    whitelist.add_argument('--wallet-whitelist', nargs=2, metavar=('WALLET_WHITELIST_DIR', 'WALLET_WHITELIST_NUM'), help='Use a wallet-based whitelist.  The provided directory should have empty files where the filenames represent wallet stake keys or payment addresses on the whitelist.  Each wallet can mint up to <N> NFTs')
 
     cli_parser = argparse.ArgumentParser(description='A vending machine for a specific NFT collection')
     subcommands = cli_parser.add_subparsers(title='subcommands', required=True, dest='command', description='valid subcommands', help='Options for the vending machine instantiation')
