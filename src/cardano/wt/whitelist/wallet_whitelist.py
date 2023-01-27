@@ -82,6 +82,7 @@ class WalletWhitelist(FilesystemBasedWhitelist):
                 raise ValueError(f"{stake_key} not on whitelist")
             for input_addr in wl_resources['input_addrs']:
                 if not input_addr in addresses:
+                    print(f"Found unexpected address {input_addr}, excluding from whitelist")
                     return 0
             return self.allowable_amount
         except Exception as e:
