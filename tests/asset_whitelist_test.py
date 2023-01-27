@@ -722,6 +722,8 @@ def test_mints_correct_number_for_single_use(request, vm_test_config, blockfrost
     nft_vending_machine.validate()
 
     asset_names = ["WildTangz 1", "WildTangz 2"]
+    expected_asset_name = asset_names.pop()
+    asset_names.append(expected_asset_name)
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
@@ -735,7 +737,7 @@ def test_mints_correct_number_for_single_use(request, vm_test_config, blockfrost
 
     profit_utxo = await_payment(profit.address, None, blockfrost_api)
     profit_txn = blockfrost_api.get_txn(profit_utxo.hash)
-    profit_expected = MINT_PRICE - Mint.RebateCalculator.calculate_rebate_for(1, 1, len(asset_names[0])) - int(profit_txn['fees'])
+    profit_expected = MINT_PRICE - Mint.RebateCalculator.calculate_rebate_for(1, 1, len(expected_asset_name)) - int(profit_txn['fees'])
     profit_actual = lovelace_in(profit_utxo)
     assert profit_actual == profit_expected, f"Expected {profit_expected}, but actual was {profit_actual}"
 

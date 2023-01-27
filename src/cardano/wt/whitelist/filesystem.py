@@ -3,7 +3,10 @@ import shutil
 
 """
 Representation of a whitelist that lives on a filesystem where the name of the
-file is the whitelist identifier (e.g., address, stake key).
+file is the whitelist identifier (e.g., address, stake key).  Note that the
+contents of the file can be empty, or they can be a one-per-line set of linked
+identifiers that need to be removed from the whitelist when this whitelist spot
+is consumed.
 """
 class FilesystemBasedWhitelist(object):
 
@@ -15,8 +18,18 @@ class FilesystemBasedWhitelist(object):
         return os.path.join(self.input_dir, identifier)
 
     def _remove_from_whitelist(self, identifier):
-        consumed_location = os.path.join(self.consumed_dir, identifier)
-        shutil.move(self.__fs_location(identifier), consumed_location)
+        identifier_location = self.__fs_location(identifier)
+        linked_id_paths = []
+        with open(identifier_location, 'r') as linked_ids:
+            for linked_id in linked_ids:
+                linked_id_path = self.__fs_location(linked_id)
+                if not os.path.exists(linked_id_path):
+                    print(f"Linked ID {linked_id} was not on whitelist, skipping...")
+                    continue
+                linked_id_paths.append(linked_id_path)
+        shutil.move(identifier_location, self.consumed_dir)
+        for linked_id_path in linked_id_paths:
+            shutil.move(linked_id_path, self.consumed_dir)
 
     def is_whitelisted(self, identifier):
         return os.path.exists(self.__fs_location(identifier))

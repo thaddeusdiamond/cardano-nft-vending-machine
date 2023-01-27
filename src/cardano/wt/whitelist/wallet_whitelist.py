@@ -109,7 +109,6 @@ class WalletWhitelist(FilesystemBasedWhitelist):
             stake_key = str(verification["signing_address"])
             if not self.is_whitelisted(stake_key):
                 raise ValueError(f"{stake_key} not on whitelist")
-            # TODO: Remove linked stake keys
             self._remove_from_whitelist(stake_key)
         except Exception as e:
             raise ValueError(f"[MANUALLY DEBUG] SOMEHOW MINTED OFF WHITELIST ({e}) WITH AN INVALIDLY SIGNED MESSAGE: {wl_resources}")
