@@ -101,7 +101,7 @@ class WalletWhitelist(FilesystemBasedWhitelist):
         """
         if not num_mints:
             return
-        if num_mints > 1:
+        if num_mints > self.allowable_amount:
             raise ValueError(f"[MANUALLY DEBUG] THERE WAS AN OVERMINT FOR A WHITELIST ({num_mints}), THE MINT WAS ALREADY PROCESSED, INVESTIGATE {wl_resources}")
         message = self._get_signed_message(wl_resources['metadata'])
         try:
