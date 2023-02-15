@@ -108,6 +108,11 @@ class NftVendingMachine(object):
         gross_profit = num_mints * self.mint.price
         change = lovelace_bal.lovelace - gross_profit
 
+        if self.mint.bogo:
+            bonuses = self.mint.bogo.determine_bonuses(num_mints_requested)
+            print(f"Bonus of {bonuses} NFTs determined based on {num_mints_requested}")
+            num_mints = min(self.single_vend_max, len(available_mints), (num_mints + bonuses))
+
         print(f"Beginning to mint {num_mints} NFTs to send to address {input_addr}")
         txn_id = int(time.time())
         nft_metadata_file = self.__lock_and_merge(available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id)

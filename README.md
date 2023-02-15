@@ -72,6 +72,7 @@ There is a sample vending machine script that is included in the ``src/`` direct
                     | --unlimited-asset-whitelist <WHITELIST_DIR> \
                     | --wallet-whitelist <WHITELIST_DIR> <NUM_ITEMS_PER_USER> ] \
                 [--dev-fee dev_fee --dev-addr dev_addr] \
+                [--bogo threshold additional] \
                 [--mainnet]
 ## Installation
 This package is available from [PyPI](https://pypi.org/) and can be installed using ``pip3``.  Python <3.8 is currently unsupported at this time.

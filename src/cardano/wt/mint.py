@@ -41,7 +41,7 @@ class Mint(object):
                     return validator[key]
         return None
 
-    def __init__(self, policy, price, dev_fee, dev_addr, nfts_dir, script, sign_key, whitelist):
+    def __init__(self, policy, price, dev_fee, dev_addr, nfts_dir, script, sign_key, whitelist, bogo=None):
         self.policy = policy
         self.price = price
         self.dev_fee = dev_fee
@@ -50,6 +50,7 @@ class Mint(object):
         self.script = script
         self.sign_key = sign_key
         self.whitelist = whitelist
+        self.bogo = bogo
 
         self.initial_slot = Mint.__read_validator('after', 'slot', script)
         self.expiration_slot = Mint.__read_validator('before', 'slot', script)

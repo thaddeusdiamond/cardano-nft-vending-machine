@@ -7,6 +7,7 @@ import random
 import signal
 import time
 
+from cardano.wt.bonuses.bogo import Bogo
 from cardano.wt.blockfrost import BlockfrostApi
 from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.mint import Mint
@@ -123,6 +124,7 @@ def get_parser():
     parser.add_argument('--vend-randomly', action='store_true', help='Randomly pick from the metadata directory (using seed 321) when listing')
     parser.add_argument('--dev-fee', type=int, required=False, help='Developer fee (in lovelace, 1/1,000,000 ₳)')
     parser.add_argument('--dev-addr', type=str, required=False, help='Address of developer wallet to send fee to')
+    parser.add_argument('--bogo', type=int, nargs=2, metavar=('BOGO_THRESHOLD', 'BOGO_ADDITIONAL'), help='Provide BOGO functionality (two arguments are the threshold for a bonus and then how many bonuses the user should get)')
 
     whitelist = parser.add_mutually_exclusive_group(required=True)
     whitelist.add_argument('--no-whitelist', action='store_true', help='No whitelist required for mints')
@@ -146,7 +148,8 @@ if __name__ == "__main__":
     _mint_price = get_mint_price(_args.mint_price, _args.free_mint)
     _whitelist = get_whitelist_type(_args, os.path.join(_args.output_dir, WL_CONSUMED_DIR_SUBDIR))
     _dev_fee = _args.dev_fee if _args.dev_fee else 0
-    _mint = Mint(_args.mint_policy, _mint_price, _dev_fee, _args.dev_addr, _args.metadata_dir, _args.mint_script, _args.mint_sign_key, _whitelist)
+    _bogo = Bogo(_args.bogo[0], _args.bogo[1]) if _args.bogo else None
+    _mint = Mint(_args.mint_policy, _mint_price, _dev_fee, _args.dev_addr, _args.metadata_dir, _args.mint_script, _args.mint_sign_key, _whitelist, _bogo)
 
     _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet, preview=_args.preview)
 
