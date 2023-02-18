@@ -69,6 +69,10 @@ class Mint(object):
                 validated_nft = self.__validated_nft(json.load(file), validated_names, filename)
                 validated_names.append(validated_nft)
         self.validated_names = validated_names
+        if not os.path.exists(self.script):
+            raise ValueError(f"Minting script file '{self.script}' not found on filesystem")
+        if not os.path.exists(self.sign_key):
+            raise ValueError(f"Signing key file '{self.sign_key}' not found on filesystem")
         print(f"Validating whitelist of type {self.whitelist.__class__}")
         self.whitelist.validate()
 

@@ -31,6 +31,8 @@ PADDING = 500000
 SINGLE_VEND_MAX = 10
 VEND_RANDOMLY = False
 
+DUMMY_SIGN_KEY = os.path.abspath(__file__)
+
 def initialize_whitelist(whitelist_dir, consumed_dir, buyers):
     os.mkdir(consumed_dir)
     os.mkdir(whitelist_dir)
@@ -48,7 +50,7 @@ def get_pycardano_network():
 def test_validate_requires_whitelist_dir_created(request, vm_test_config):
     whitelist = WalletWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir, NUM_WHITELISTED)
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, simple_script, None, whitelist)
+    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, simple_script, DUMMY_SIGN_KEY, whitelist)
     try:
         mint.validate()
         assert False, "Successfully validated mint without a whitelist directory"
@@ -59,7 +61,7 @@ def test_validate_requires_consumed_dir_created(request, vm_test_config):
     os.mkdir(vm_test_config.whitelist_dir)
     whitelist = WalletWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir, NUM_WHITELISTED)
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, simple_script, None, whitelist)
+    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, simple_script, DUMMY_SIGN_KEY, whitelist)
     try:
         mint.validate()
         assert False, "Successfully validated mint without a whitelist directory"

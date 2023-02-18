@@ -30,6 +30,8 @@ WL_REBATE = 5000000
 PADDING = 500000
 MIN_UTXO_PAYMENT = 2000000
 
+DUMMY_SIGN_KEY = os.path.abspath(__file__)
+
 def initialize_asset_wl(whitelist_dir, consumed_dir, wl_policy, request, blockfrost_api):
     wl_initializer_args = [
         '--blockfrost-project', blockfrost_api.project,
@@ -47,7 +49,7 @@ def initialize_asset_wl(whitelist_dir, consumed_dir, wl_policy, request, blockfr
 def test_validate_requires_whitelist_dir_created(request, vm_test_config):
     whitelist = SingleUseWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, simple_script, None, whitelist)
+    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, simple_script, DUMMY_SIGN_KEY, whitelist)
     try:
         mint.validate()
         assert False, "Successfully validated mint without a whitelist directory"
@@ -58,7 +60,7 @@ def test_validate_requires_consumed_dir_created(request, vm_test_config):
     os.mkdir(vm_test_config.whitelist_dir)
     whitelist = SingleUseWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, simple_script, None, whitelist)
+    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, simple_script, DUMMY_SIGN_KEY, whitelist)
     try:
         mint.validate()
         assert False, "Successfully validated mint without a whitelist directory"

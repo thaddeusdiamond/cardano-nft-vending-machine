@@ -9,6 +9,7 @@ from cardano.wt.mint import Mint
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
 TANGZ_POLICY = '33568ad11f93b3e79ae8dee5ad928ded72adcea719e92108caf1521b'
+DUMMY_SIGN_KEY = os.path.abspath(__file__)
 
 def test_rejects_if_no_script_file():
     try:
@@ -28,14 +29,14 @@ def test_rejects_if_no_metadata_directory(request, vm_test_config):
 
 def test_accepts_script_with_before_after(request, vm_test_config):
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(TANGZ_POLICY, None, None, None, vm_test_config.metadata_dir, simple_script, None, NoWhitelist())
+    mint = Mint(TANGZ_POLICY, None, None, None, vm_test_config.metadata_dir, simple_script, DUMMY_SIGN_KEY, NoWhitelist())
     mint.validate()
     assert mint.initial_slot == 12345678
     assert mint.expiration_slot == 87654321
 
 def test_accepts_script_with_no_expiration(request, vm_test_config):
     simple_script = data_file_path(request, os.path.join('scripts', 'noexpiration.script'))
-    mint = Mint(TANGZ_POLICY, None, None, None, vm_test_config.metadata_dir, simple_script, None, NoWhitelist())
+    mint = Mint(TANGZ_POLICY, None, None, None, vm_test_config.metadata_dir, simple_script, DUMMY_SIGN_KEY, NoWhitelist())
     mint.validate()
     assert mint.initial_slot == None
     assert mint.expiration_slot == None

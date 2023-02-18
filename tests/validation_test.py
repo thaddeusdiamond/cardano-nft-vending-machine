@@ -62,12 +62,32 @@ def test_does_not_allow_dev_fee_below_min_utxo(request):
     except ValueError as e:
         assert f"{Utxo.MIN_UTXO_VALUE - 1}" in str(e)
 
+def test_does_not_allow_nonexistent_script_file(request):
+    try:
+        simple_script = '/path/does/not/exist'
+        mint = Mint(None, 5000000, 0, None, None, simple_script, None, None)
+        mint.validate()
+        assert False, "Successfully validated mint with nonexistent script file"
+    except FileNotFoundError as e:
+        assert f"No such file or directory: '{simple_script}'" in str(e)
+
+def test_does_not_allow_nonexistent_sign_key(request, vm_test_config):
+    try:
+        simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
+        sign_key = '/path/does/not/exist'
+        mint = Mint(None, 5000000, 0, None, vm_test_config.metadata_dir, simple_script, sign_key, None)
+        mint.validate()
+        assert False, "Successfully validated mint with nonexistent sign key file"
+    except ValueError as e:
+        assert f"Signing key file '{sign_key}'" in str(e)
+
 def test_does_not_allow_dev_fee_rebate_min_utxo_to_exceed_price(request, vm_test_config):
     sample_price = 5000000
     sample_donation = 1000000
     try:
         simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-        mint = Mint(TANGZ_POLICY, sample_price, sample_donation, 'addr123', vm_test_config.metadata_dir, simple_script, None, NoWhitelist())
+        sign_key = data_file_path(request, os.path.join('protocol', 'preprod.json'))
+        mint = Mint(TANGZ_POLICY, sample_price, sample_donation, 'addr123', vm_test_config.metadata_dir, simple_script, sign_key, NoWhitelist())
         for i in range(1, 30):
             filename = f"WildTangz {i}.json"
             data_file = data_file_path(request, os.path.join('smoketest', filename))
