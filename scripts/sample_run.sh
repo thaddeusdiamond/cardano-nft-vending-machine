@@ -72,7 +72,8 @@ venv/bin/pip3 install --upgrade pip
 venv/bin/pip3 install cardano-nft-vending-machine
 
 # [OPTIONAL] Create a whitelist directory for any whitelists you will be running
-venv/bin/python3 cardano-nft-vending-machine/scripts/initialize_asset_wl.py \
+venv/bin/python3 cardano-nft-vending-machine/scripts/initialize_whitelist.py \
+  asset \
   --blockfrost-project $SET_YOUR_BLOCKFROST_PROJ_HERE \
   --consumed-dir output/wl_consumed \
   --policy-id $(cat policies/nftpolicyID) \

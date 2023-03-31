@@ -21,8 +21,9 @@ class AssetWhitelist(FilesystemBasedWhitelist):
         return txn_utxos['outputs']
 
 """
-A whitelist implementation that allows 1 mint per whitelisted asset for the
-duration of the mint.
+A whitelist implementation that allows up to N mints per whitelisted asset for
+the duration of the mint (based on how many whitelist slots were initialized
+ahead of time).
 """
 class SingleUseWhitelist(AssetWhitelist):
 
@@ -43,8 +44,7 @@ class SingleUseWhitelist(AssetWhitelist):
             utxo_amounts = utxo_output['amount']
             for utxo_amount in utxo_amounts:
                 asset_id = utxo_amount['unit']
-                if self.is_whitelisted(asset_id):
-                    num_whitelisted += 1
+                num_whitelisted += self.num_whitelisted(asset_id)
         return num_whitelisted
 
     def consume(self, wl_resources, num_mints):
@@ -65,17 +65,16 @@ class SingleUseWhitelist(AssetWhitelist):
                 if not remaining_to_remove:
                     return
                 asset_id = utxo_amount['unit']
-                if not self.is_whitelisted(asset_id):
-                    continue
-                self._remove_from_whitelist(asset_id)
-                remaining_to_remove -= 1
+                num_removed = min(remaining_to_remove, self.num_whitelisted(asset_id))
+                self._remove_from_whitelist(asset_id, num_removed)
+                remaining_to_remove -= num_removed
         if remaining_to_remove != 0:
             raise ValueError(f"[MANUALLY DEBUG] THERE WAS AN OVERMINT FOR A WHITELIST ({remaining_to_remove}), THE MINT WAS ALREADY PROCESSED, INVESTIGATE {wl_resources}")
 
 
 """
-A whitelist implementation that allows unlimited mints per whitelisted asset for the
-duration of the mint.
+A whitelist implementation that allows unlimited mints per whitelisted asset for
+the duration of the mint.
 """
 class UnlimitedWhitelist(AssetWhitelist):
 
@@ -95,7 +94,7 @@ class UnlimitedWhitelist(AssetWhitelist):
             utxo_amounts = utxo_output['amount']
             for utxo_amount in utxo_amounts:
                 asset_id = utxo_amount['unit']
-                if self.is_whitelisted(asset_id):
+                if self.num_whitelisted(asset_id) > 0:
                     return sys.maxsize
         return 0
 

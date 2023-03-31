@@ -14,9 +14,8 @@ class WalletWhitelist(FilesystemBasedWhitelist):
     _MSG_LABEL = '674'
     _SIGNATURE_KEY = 'whitelist_proof'
 
-    def __init__(self, input_dir, consumed_dir, allowable_amount):
+    def __init__(self, input_dir, consumed_dir):
         super().__init__(input_dir, consumed_dir)
-        self.allowable_amount = allowable_amount
 
     def required_info(self, mint_utxo, txn_utxos, blockfrost):
         """
@@ -69,7 +68,7 @@ class WalletWhitelist(FilesystemBasedWhitelist):
         0.
 
         :param wl_resources: The transaction's metadata (used for signatures)
-        :return: {self.allowable_amount} if a wallet is on the whitelist, 0 otherwise
+        :return: Slots remaining if a wallet is on the whitelist, 0 otherwise
         """
         message = self._get_signed_message(wl_resources['metadata'])
         if not message:
@@ -78,13 +77,14 @@ class WalletWhitelist(FilesystemBasedWhitelist):
             verification = cip8.verify(message)
             stake_key = str(verification["signing_address"])
             addresses = verification["message"].strip().split(',')
-            if not self.is_whitelisted(stake_key):
+            num_whitelisted = self.num_whitelisted(stake_key)
+            if not num_whitelisted:
                 raise ValueError(f"{stake_key} not on whitelist")
             for input_addr in wl_resources['input_addrs']:
                 if not input_addr in addresses:
-                    print(f"Found unexpected address {input_addr}, excluding from whitelist")
+                    print(f"Found unexpected address {input_addr}, excluding stake key from whitelist")
                     return 0
-            return self.allowable_amount
+            return num_whitelisted
         except Exception as e:
             print(f"Failed to verify {message}: {e}")
             return 0
@@ -101,14 +101,15 @@ class WalletWhitelist(FilesystemBasedWhitelist):
         """
         if not num_mints:
             return
-        if num_mints > self.allowable_amount:
-            raise ValueError(f"[MANUALLY DEBUG] THERE WAS AN OVERMINT FOR A WHITELIST ({num_mints}), THE MINT WAS ALREADY PROCESSED, INVESTIGATE {wl_resources}")
         message = self._get_signed_message(wl_resources['metadata'])
         try:
             verification = cip8.verify(message)
             stake_key = str(verification["signing_address"])
-            if not self.is_whitelisted(stake_key):
-                raise ValueError(f"{stake_key} not on whitelist")
-            self._remove_from_whitelist(stake_key)
+            num_whitelisted = self.num_whitelisted(stake_key)
+            if num_mints > num_whitelisted:
+                raise ValueError(f"[MANUALLY DEBUG] THERE WAS AN OVERMINT FOR A WHITELIST ({num_mints}), THE MINT WAS ALREADY PROCESSED, INVESTIGATE {wl_resources}")
+            if not num_whitelisted:
+                raise ValueError(f"[MANUALLY DEBUG] {stake_key} IS NOT ON THE WHITELIST BUT MINTED!")
+            self._remove_from_whitelist(stake_key, num_mints)
         except Exception as e:
             raise ValueError(f"[MANUALLY DEBUG] SOMEHOW MINTED OFF WHITELIST ({e}) WITH AN INVALIDLY SIGNED MESSAGE: {wl_resources}")

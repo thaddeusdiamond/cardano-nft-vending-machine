@@ -96,7 +96,7 @@ def get_whitelist_type(args, wl_output_dir):
     if args.unlimited_asset_whitelist:
         return UnlimitedWhitelist(args.unlimited_asset_whitelist, wl_output_dir)
     if args.wallet_whitelist:
-        return WalletWhitelist(args.wallet_whitelist[0], wl_output_dir, int(args.wallet_whitelist[1]))
+        return WalletWhitelist(args.wallet_whitelist, wl_output_dir)
 
 def get_mint_price(mint_price, free_mint):
     assert(not (free_mint and mint_price))
@@ -128,9 +128,9 @@ def get_parser():
 
     whitelist = parser.add_mutually_exclusive_group(required=True)
     whitelist.add_argument('--no-whitelist', action='store_true', help='No whitelist required for mints')
-    whitelist.add_argument('--single-use-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have files where the filenames represent asset IDs on the whitelist and the contents represent linked identifiers (exactly one per line).  Each asset can mint exactly 1 NFT')
+    whitelist.add_argument('--single-use-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have files where the filenames represent asset IDs on the whitelist and the contents represent linked identifiers (exactly one per line).  Each asset can mint up to <N> NFT')
     whitelist.add_argument('--unlimited-asset-whitelist', type=str, help='Use an asset-based whitelist.  The provided directory should have files where the filenames represent asset IDs on the whitelist and the contents represent linked identifiers (exactly one per line).  Each asset can mint unlimited NFTs')
-    whitelist.add_argument('--wallet-whitelist', nargs=2, metavar=('WALLET_WHITELIST_DIR', 'WALLET_WHITELIST_NUM'), help='Use a wallet-based whitelist.  The provided directory should have files where the filenames represent wallet stake keys or payment addresses on the whitelist and the contents represent linked identifiers (exactly one per line).  Each wallet can mint up to <N> NFTs')
+    whitelist.add_argument('--wallet-whitelist', type=str, help='Use a wallet-based whitelist.  The provided directory should have files where the filenames represent wallet stake keys or payment addresses on the whitelist and the contents represent linked identifiers (exactly one per line).  Each wallet can mint up to <N> NFTs')
 
     cli_parser = argparse.ArgumentParser(description='A vending machine for a specific NFT collection')
     subcommands = cli_parser.add_subparsers(title='subcommands', required=True, dest='command', description='valid subcommands', help='Options for the vending machine instantiation')

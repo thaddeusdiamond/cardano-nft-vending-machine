@@ -24,16 +24,6 @@ class NoWhitelist(object):
         """
         return sys.maxsize
 
-    def is_whitelisted(self, object):
-        """
-        For whitelists, this is a bit of a polyglot function to determine
-        whether an object (e.g., asset or address) is whitelisted.
-
-        :param object: The generic object to be tested
-        :return: True or False (True for base implementation always)
-        """
-        return True
-
     def consume(self, wl_resources, num_mints):
         """
         No-operation because there is no whitelist to be consumed.

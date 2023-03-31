@@ -70,7 +70,7 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 [--no-whitelist | \
                   [--single-use-asset-whitelist <WHITELIST_DIR> \
                     | --unlimited-asset-whitelist <WHITELIST_DIR> \
-                    | --wallet-whitelist <WHITELIST_DIR> <NUM_ITEMS_PER_USER> ] \
+                    | --wallet-whitelist <WHITELIST_DIR> ] \
                 [--dev-fee dev_fee --dev-addr dev_addr] \
                 [--bogo threshold additional] \
                 [--mainnet]
@@ -80,10 +80,10 @@ This package is available from [PyPI](https://pypi.org/) and can be installed us
 	pip3 install cardano-nft-vending-machine
 ### Scripts
 In the `scripts/` directory there are several scripts that can be used to help operationalize the vending machine.
-#### initialize_asset_wl.py
+#### initialize_whitelist.py
 This file should be used exactly once to initialize an asset-based whitelist for an existing NFT policy with *ALL* of the assets that are currently minted.  Note that the `CONSUMED_DIR` folder is created but left empty so that the vending machine (e.g., started with `main.py`) can use it during running.
 
-	usage: initialize_asset_wl.py [-h] --blockfrost-project BLOCKFROST_PROJECT --consumed-dir CONSUMED_DIR [--mainnet] --policy-id POLICY_ID [--preview] --whitelist-dir WHITELIST_DIR
+	usage: initialize_whitelist.py [-h] asset --blockfrost-project BLOCKFROST_PROJECT --consumed-dir CONSUMED_DIR [--mainnet] --policy-id POLICY_ID [--preview] --whitelist-dir WHITELIST_DIR
 	Initialize an asset-based whitelist for an existing NFT policy
 	optional arguments:
 	-h, --help
@@ -100,6 +100,8 @@ This file should be used exactly once to initialize an asset-based whitelist for
 		Run the initializer against preview assets (default is False [preprod])
 	--whitelist-dir WHITELIST_DIR
 		Local folder where whitelist files are stored (MUST NOT YET EXIST)
+  --num-mints-per-wl NUMBER
+    How many whitelist spots are available for each asset on the whitelist
 
 #### upload_wl_usage.py
 
