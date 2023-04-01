@@ -117,6 +117,8 @@ This file should be run continuously during a whitelist mint to upload changes i
 		Where to store the new used whitelist information if any changes (can be same as --old-wl-file)
 	--whitelist-dir WHITELIST_DIR
 		Local folder where consumed whitelist files have gone after processing by vending machine
+	--whitelist-dir WHITELIST_DIR
+		Local folder where unused whitelist files are stored to be processed by vending machine
 	--credentials CREDENTIALS
 		JSON-formatted application-specific credentials
 	--upload-method UPLOAD_METHOD
