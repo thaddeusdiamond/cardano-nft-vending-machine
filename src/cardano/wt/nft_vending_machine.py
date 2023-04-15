@@ -70,7 +70,7 @@ class NftVendingMachine(object):
         return combined_output_path
 
     def __do_vend(self, mint_req, output_dir, locked_subdir, metadata_subdir):
-        available_mints = os.listdir(self.mint.nfts_dir)
+        available_mints = sorted(os.listdir(self.mint.nfts_dir))
         if not available_mints:
             print("WARNING: Metadata directory is empty, please restock the vending machine...")
         elif self.vend_randomly:
