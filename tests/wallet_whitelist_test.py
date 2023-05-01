@@ -1020,7 +1020,7 @@ def test_successfully_mints_signed_stake_key_once(request, vm_test_config, block
 
     burn_payment = lovelace_in(minted_utxo)
     burn_txn = burn_and_reclaim_tada(
-            [asset_names[1]],
+            [asset_names[0]],
             policy,
             policy_keys,
             EXPIRATION,
@@ -1242,7 +1242,7 @@ def test_supports_whitelisted_unstaked_addresses(request, vm_test_config, blockf
     nft_vending_machine.validate()
 
     asset_names = ["WildTangz 1", "WildTangz 2"]
-    expected_asset_name = asset_names.pop()
+    expected_asset_name = asset_names.pop(0)
     asset_names.append(expected_asset_name)
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
@@ -1560,7 +1560,7 @@ def test_avoids_duplicates_with_diff_payment_key(request, vm_test_config, blockf
     nft_vending_machine.validate()
 
     asset_names = ["WildTangz 1", "WildTangz 2"]
-    expected_asset_name = asset_names.pop()
+    expected_asset_name = asset_names.pop(0)
     asset_names.append(expected_asset_name)
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
@@ -1766,7 +1766,7 @@ def test_avoids_duplicates_with_linked_stake_keys(request, vm_test_config, block
     nft_vending_machine.validate()
 
     asset_names = ["WildTangz 1", "WildTangz 2"]
-    expected_asset_name = asset_names.pop()
+    expected_asset_name = asset_names.pop(0)
     asset_names.append(expected_asset_name)
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
@@ -1973,7 +1973,7 @@ def test_skips_non_whitelisted_linked_stake_keys(request, vm_test_config, blockf
     nft_vending_machine.validate()
 
     asset_names = ["WildTangz 1", "WildTangz 2"]
-    expected_asset_name = asset_names.pop()
+    expected_asset_name = asset_names.pop(0)
     asset_names.append(expected_asset_name)
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
@@ -2262,7 +2262,7 @@ def test_should_allow_multiple_txns_for_multiple_slots(request, vm_test_config, 
 
     burn_payment = lovelace_in(minted_utxo)
     burn_txn = burn_and_reclaim_tada(
-            [asset_names[1]],
+            [asset_names[0]],
             policy,
             policy_keys,
             EXPIRATION,
@@ -2279,7 +2279,7 @@ def test_should_allow_multiple_txns_for_multiple_slots(request, vm_test_config, 
     second_mint_utxo = await_payment(linked_wallet.address, None, blockfrost_api)
     second_burn_payment = lovelace_in(second_mint_utxo)
     second_burn_txn = burn_and_reclaim_tada(
-            [asset_names[0]],
+            [asset_names[1]],
             policy,
             policy_keys,
             EXPIRATION,

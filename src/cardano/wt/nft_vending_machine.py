@@ -56,7 +56,7 @@ class NftVendingMachine(object):
     def __lock_and_merge(self, available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id):
         combined_nft_metadata = {}
         for i in range(num_mints):
-            mint_metadata_filename = available_mints.pop()
+            mint_metadata_filename = available_mints.pop(0)
             mint_metadata_orig = os.path.join(self.mint.nfts_dir, mint_metadata_filename)
             with open(mint_metadata_orig, 'r') as mint_metadata_handle:
                 mint_metadata = json.load(mint_metadata_handle)
