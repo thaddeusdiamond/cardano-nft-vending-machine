@@ -16,14 +16,16 @@ def get_preview_env():
 def get_network_magic():
     return BlockfrostApi.PREVIEW_MAGIC if get_preview_env() else BlockfrostApi.PREPROD_MAGIC
 
-@pytest.fixture
-def blockfrost_api(request):
-    blockfrost_key = None
+def get_blockfrost_key(request):
     blockfrost_keyfile_path = 'blockfrost-preview.key' if get_preview_env() else 'blockfrost-preprod.key'
     with open(secrets_file_path(request, blockfrost_keyfile_path)) as blockfrost_keyfile:
-        blockfrost_key = blockfrost_keyfile.read().strip()
+        return blockfrost_keyfile.read().strip()
+    return None
+
+@pytest.fixture
+def blockfrost_api(request):
     return BlockfrostApi(
-        blockfrost_key,
+        get_blockfrost_key(request),
         mainnet=get_mainnet_env(),
         preview=get_preview_env(),
         max_get_retries=BLOCKFROST_RETRIES

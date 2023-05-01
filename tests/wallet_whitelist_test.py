@@ -11,7 +11,7 @@ from test_utils.keys import KeyPair
 from test_utils.policy import Policy, new_policy_for
 from test_utils.vending_machine import vm_test_config
 
-from test_utils.blockfrost import blockfrost_api, get_mainnet_env, get_network_magic
+from test_utils.blockfrost import blockfrost_api, get_blockfrost_key, get_mainnet_env, get_network_magic
 from test_utils.config import get_funder_address
 from test_utils.chain import await_payment, burn_and_reclaim_tada, cardano_cli, find_min_utxos_for_txn, lovelace_in, policy_is_empty, send_money
 from test_utils.fs import data_file_path
@@ -48,6 +48,7 @@ def initialize_whitelist(request, vm_test_config, whitelist_dir, consumed_dir, b
     wl_initializer_args = [
         'wallet',
         '--wallet-file', temporary_file,
+        '--blockfrost-project', get_blockfrost_key(request),
         '--consumed-dir', consumed_dir,
         '--whitelist-dir', whitelist_dir,
         '--num-mints-per-wl', str(num_mints_per_wl)
