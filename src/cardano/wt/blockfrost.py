@@ -4,6 +4,7 @@ import time
 
 from http import HTTPStatus
 
+from cardano.wt import network
 from cardano.wt.utxo import Utxo
 
 """
@@ -11,8 +12,8 @@ Repreentation of the Blockfrost web API used in retrieving metadata about txn i/
 """
 class BlockfrostApi(object):
 
-    PREPROD_MAGIC = '1'
-    PREVIEW_MAGIC = '2'
+    PREPROD_MAGIC = network.PREPROD_MAGIC
+    PREVIEW_MAGIC = network.PREVIEW_MAGIC
 
     _API_CALLS_PER_SEC = 10
     _APPLICATION_JSON = 'application/json'

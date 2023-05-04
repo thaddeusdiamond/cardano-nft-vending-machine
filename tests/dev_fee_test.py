@@ -25,7 +25,7 @@ PADDING = 500000
 
 def test_invalid_dev_fees_fail_validation(request, vm_test_config):
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(None, MINT_PRICE, 500000, None, vm_test_config.metadata_dir, simple_script, None, None)
+    mint = Mint(MINT_PRICE, 500000, None, vm_test_config.metadata_dir, [simple_script], None, None)
     try:
         mint.validate()
         assert False, "Successfully validated mint with too small of dev fee"
@@ -34,7 +34,7 @@ def test_invalid_dev_fees_fail_validation(request, vm_test_config):
 
 def test_invalid_dev_addr_fails_validation(request, vm_test_config):
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, None, vm_test_config.metadata_dir, simple_script, None, None)
+    mint = Mint(MINT_PRICE, DEV_FEE_AMT, None, vm_test_config.metadata_dir, [simple_script], None, None)
     try:
         mint.validate()
         assert False, "Successfully validated mint with no dev fee address"
@@ -89,13 +89,12 @@ def test_dev_fees_are_not_paid_with_no_mint(request, vm_test_config, blockfrost_
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             developer.address,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             NoWhitelist()
     )
     profit = Address.new(
@@ -192,14 +191,17 @@ def test_dev_fee_works(request, vm_test_config, blockfrost_api, cardano_cli):
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
+
+    asset_names = [f'WildTangz {serial}' for serial in range(1, SINGLE_VEND_MAX + 1)]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             developer.address,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             NoWhitelist()
     )
     profit = Address.new(
@@ -219,9 +221,6 @@ def test_dev_fee_works(request, vm_test_config, blockfrost_api, cardano_cli):
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = [f'WildTangz {serial}' for serial in range(1, SINGLE_VEND_MAX + 1)]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,

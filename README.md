@@ -33,8 +33,8 @@ The library consists of several Python objects representing the mint process.  T
     # There are several sample whitelist implementations in cardano.wt.whitelist or you can implement your own
     whitelist = SingleUseWhitelist('/path/to/whitelisted/assets/directory')
 
-    # The Mint object below represents your Mint policy and specifies price, and developer fee in Lovelace (both can be 0)
-    mint = Mint('<POLICY_ID>', 10000000, 1000000, 'addr1_developer', '/path/to/nft/json/metadata', '/path/to/mint/script', '/path/to/mint.skey', whitelist)
+    # The Mint object below represents your Mint and specifies price, and developer fee in Lovelace (both can be 0)
+    mint = Mint(10000000, 1000000, 'addr1_developer', '/path/to/nft/json/metadata', '/path/to/mint/script', '/path/to/mint.skey', whitelist)
 
     # Blockfrost is used in the code to validate where the UTXO sent to the payment address came from
     blockfrost_api = BlockfrostApi('<BLOCKFROST_PROJ_ID>', mainnet=True)
@@ -61,7 +61,6 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 [--mint-price <PRICE_LOVELACE> | --free-mint] \
                 --mint-script /FULL/PATH/TO/policy.script \
                 --mint-sign-key /FULL/PATH/TO/policy.skey \
-                --mint-policy $(cat /FULL/PATH/TO/policyID) \
                 --blockfrost-project <BLOCKFROST_PROJECT_ID> \
                 --metadata-dir metadata/ \
                 --output-dir output/ \

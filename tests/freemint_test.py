@@ -65,14 +65,17 @@ def test_returns_exactly_single_vend_max_with_rebate(request, vm_test_config, bl
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
+
+    asset_names = [f'WildTangz {serial}' for serial in range(1, SINGLE_VEND_MAX + 1)]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             NoWhitelist()
     )
     profit = Address.new(
@@ -92,9 +95,6 @@ def test_returns_exactly_single_vend_max_with_rebate(request, vm_test_config, bl
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = [f'WildTangz {serial}' for serial in range(1, SINGLE_VEND_MAX + 1)]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,
@@ -180,14 +180,17 @@ def test_returns_max_possible_if_rebate_too_small(request, vm_test_config, block
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
+
+    asset_names = [f'WildTangz {serial}' for serial in range(1, SINGLE_VEND_MAX + 1)]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             NoWhitelist()
     )
     profit = Address.new(
@@ -207,9 +210,6 @@ def test_returns_max_possible_if_rebate_too_small(request, vm_test_config, block
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = [f'WildTangz {serial}' for serial in range(1, SINGLE_VEND_MAX + 1)]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,

@@ -74,14 +74,17 @@ def test_does_not_bonus_below_threshold(request, vm_test_config, blockfrost_api,
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
+
+    asset_names = [f'WildTangz {serial}' for serial in range(1, SINGLE_VEND_MAX + 1)]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             NoWhitelist(),
             Bogo(THRESHOLD, ADDITIONAL)
     )
@@ -102,9 +105,6 @@ def test_does_not_bonus_below_threshold(request, vm_test_config, blockfrost_api,
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = [f'WildTangz {serial}' for serial in range(1, SINGLE_VEND_MAX + 1)]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,
@@ -212,14 +212,17 @@ def test_bonuses_single_or_multis(request, vm_test_config, blockfrost_api, carda
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
+
+    asset_names = [f'WildTangz {serial}' for serial in range(1, SINGLE_VEND_MAX + 1)]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             NoWhitelist(),
             Bogo(THRESHOLD, ADDITIONAL)
     )
@@ -240,9 +243,6 @@ def test_bonuses_single_or_multis(request, vm_test_config, blockfrost_api, carda
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = [f'WildTangz {serial}' for serial in range(1, SINGLE_VEND_MAX + 1)]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,
@@ -377,14 +377,17 @@ def test_honors_max_available(request, vm_test_config, blockfrost_api, cardano_c
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
+
+    asset_names = [f'WildTangz {serial}' for serial in range(1, THRESHOLD + 1)]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             NoWhitelist(),
             Bogo(THRESHOLD, ADDITIONAL)
     )
@@ -405,9 +408,6 @@ def test_honors_max_available(request, vm_test_config, blockfrost_api, cardano_c
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = [f'WildTangz {serial}' for serial in range(1, THRESHOLD + 1)]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,
@@ -518,14 +518,17 @@ def test_honors_single_vend_max(request, vm_test_config, blockfrost_api, cardano
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
+
+    asset_names = [f'WildTangz {serial}' for serial in range(1, SINGLE_VEND_MAX + 1)]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             NoWhitelist(),
             Bogo(THRESHOLD, ADDITIONAL)
     )
@@ -546,9 +549,6 @@ def test_honors_single_vend_max(request, vm_test_config, blockfrost_api, cardano
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = [f'WildTangz {serial}' for serial in range(1, SINGLE_VEND_MAX + 1)]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,

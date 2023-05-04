@@ -31,8 +31,6 @@ WL_REBATE = 5000000
 PADDING = 500000
 MIN_UTXO_PAYMENT = 2000000
 
-DUMMY_SIGN_KEY = os.path.abspath(__file__)
-
 def initialize_asset_wl(whitelist_dir, consumed_dir, wl_policy, request, blockfrost_api, num_mints_per_wl=1):
     wl_initializer_args = [
         'asset',
@@ -52,7 +50,8 @@ def initialize_asset_wl(whitelist_dir, consumed_dir, wl_policy, request, blockfr
 def test_validate_requires_whitelist_dir_created(request, vm_test_config):
     whitelist = SingleUseWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, simple_script, DUMMY_SIGN_KEY, whitelist)
+    sign_key = data_file_path(request, os.path.join('sign_keys', 'dummy.skey'))
+    mint = Mint(MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, [simple_script], [sign_key], whitelist)
     try:
         mint.validate()
         assert False, "Successfully validated mint without a whitelist directory"
@@ -63,7 +62,8 @@ def test_validate_requires_consumed_dir_created(request, vm_test_config):
     os.mkdir(vm_test_config.whitelist_dir)
     whitelist = SingleUseWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(None, MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, simple_script, DUMMY_SIGN_KEY, whitelist)
+    sign_key = data_file_path(request, os.path.join('sign_keys', 'dummy.skey'))
+    mint = Mint(MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, [simple_script], [sign_key], whitelist)
     try:
         mint.validate()
         assert False, "Successfully validated mint without a whitelist directory"
@@ -143,14 +143,17 @@ def test_rejects_if_no_asset_sent_to_self(request, vm_test_config, blockfrost_ap
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+
+    asset_name = "WildTangz 1"
+    create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             whitelist
     )
     profit = Address.new(
@@ -170,9 +173,6 @@ def test_rejects_if_no_asset_sent_to_self(request, vm_test_config, blockfrost_ap
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_name = "WildTangz 1"
-    create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,
@@ -292,13 +292,12 @@ def test_remains_on_whitelist_if_vendingmachine_empty(request, vm_test_config, b
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             whitelist
     )
     profit = Address.new(
@@ -427,14 +426,17 @@ def test_rejects_if_asset_sent_as_reference_input(request, vm_test_config, block
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+
+    asset_name = "WildTangz 1"
+    create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             whitelist
     )
     profit = Address.new(
@@ -454,9 +456,6 @@ def test_rejects_if_asset_sent_as_reference_input(request, vm_test_config, block
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_name = "WildTangz 1"
-    create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,
@@ -562,14 +561,17 @@ def test_excludes_if_asset_sent_directly(request, vm_test_config, blockfrost_api
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+
+    asset_name = "WildTangz 1"
+    create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             whitelist
     )
     profit = Address.new(
@@ -589,9 +591,6 @@ def test_excludes_if_asset_sent_directly(request, vm_test_config, blockfrost_api
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_name = "WildTangz 1"
-    create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     exclusions = set()
     nft_vending_machine.vend(
@@ -698,14 +697,19 @@ def test_mints_correct_number_for_single_use(request, vm_test_config, blockfrost
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+
+    asset_names = ["WildTangz 1", "WildTangz 2"]
+    expected_asset_name = asset_names.pop()
+    asset_names.append(expected_asset_name)
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             whitelist
     )
     profit = Address.new(
@@ -725,11 +729,6 @@ def test_mints_correct_number_for_single_use(request, vm_test_config, blockfrost
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = ["WildTangz 1", "WildTangz 2"]
-    expected_asset_name = asset_names.pop()
-    asset_names.append(expected_asset_name)
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,
@@ -916,14 +915,17 @@ def test_mints_correct_number_for_multiple_passes(request, vm_test_config, block
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+
+    asset_names = ["WildTangz 1", "WildTangz 2", "WildTangz 3"]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             whitelist
     )
     profit = Address.new(
@@ -943,9 +945,6 @@ def test_mints_correct_number_for_multiple_passes(request, vm_test_config, block
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = ["WildTangz 1", "WildTangz 2", "WildTangz 3"]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,
@@ -1124,14 +1123,17 @@ def test_mints_correct_number_with_same_utxo(request, vm_test_config, blockfrost
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+
+    asset_names = ["WildTangz 1", "WildTangz 2", "WildTangz 3"]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             whitelist
     )
     profit = Address.new(
@@ -1151,9 +1153,6 @@ def test_mints_correct_number_with_same_utxo(request, vm_test_config, blockfrost
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = ["WildTangz 1", "WildTangz 2", "WildTangz 3"]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     exclusions = set()
     nft_vending_machine.vend(
@@ -1324,14 +1323,17 @@ def test_mints_correct_number_for_unlimited_use(request, vm_test_config, blockfr
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+
+    asset_names = ["WildTangz 1", "WildTangz 2", "WildTangz 3", "WildTangz 4"]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             whitelist
     )
     profit = Address.new(
@@ -1351,9 +1353,6 @@ def test_mints_correct_number_for_unlimited_use(request, vm_test_config, blockfr
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = ["WildTangz 1", "WildTangz 2", "WildTangz 3", "WildTangz 4"]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,
@@ -1536,14 +1535,17 @@ def test_respects_single_vend_max_for_unlimited_use(request, vm_test_config, blo
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+
+    asset_names = ["WildTangz 1", "WildTangz 2", "WildTangz 3", "WildTangz 4", "WildTangz 5"]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             whitelist
     )
     profit = Address.new(
@@ -1563,9 +1565,6 @@ def test_respects_single_vend_max_for_unlimited_use(request, vm_test_config, blo
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = ["WildTangz 1", "WildTangz 2", "WildTangz 3", "WildTangz 4", "WildTangz 5"]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     nft_vending_machine.vend(
             vm_test_config.root_dir,
@@ -1701,14 +1700,17 @@ def test_should_allow_multiple_txns_for_multiple_slots(request, vm_test_config, 
 
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+
+    asset_names = ["WildTangz 1", "WildTangz 2", "WildTangz 3", "WildTangz 4"]
+    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
+
     mint = Mint(
-            policy.id,
             MINT_PRICE,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             whitelist
     )
     profit = Address.new(
@@ -1728,9 +1730,6 @@ def test_should_allow_multiple_txns_for_multiple_slots(request, vm_test_config, 
             mainnet=get_mainnet_env()
     )
     nft_vending_machine.validate()
-
-    asset_names = ["WildTangz 1", "WildTangz 2", "WildTangz 3", "WildTangz 4"]
-    create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     exclusions = set()
     nft_vending_machine.vend(

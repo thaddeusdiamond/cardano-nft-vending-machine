@@ -1,9 +1,11 @@
 import json
 import os
 import subprocess
+import tempfile
 
 from deprecated import deprecated
 
+from cardano.wt import network
 from cardano.wt.utxo import Utxo
 
 """
@@ -25,8 +27,13 @@ class CardanoCli(object):
         print(f'[STDERR] {err}')
         return out
 
-    def named_asset_str(nft_policy, nft_names):
-        return '+'.join(['.'.join([f"1 {nft_policy}", nft_name]) for nft_name in nft_names])
+    def named_assets_str(nft_policy_map):
+        named_assets = []
+        for policy in nft_policy_map:
+            for nft_name in nft_policy_map[policy]:
+                hex_name = nft_name.encode('UTF-8').hex()
+                named_assets.append(f"{policy}.{hex_name}")
+        return '+'.join([f"1 {named_asset}" for named_asset in named_assets])
 
     def build_raw_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, addl_args, era='--alonzo-era'):
         raw_build_file = os.path.join(output_dir, CardanoCli.TXN_DIR, f"txn_{txn_id}.raw.build")
@@ -37,9 +44,12 @@ class CardanoCli(object):
         )
         return raw_build_file
 
-    def build_raw_mint_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint, nft_names):
-        named_asset_str = CardanoCli.named_asset_str(mint.policy, nft_names)
-        mint_args = [f"--mint=\"{named_asset_str}\"", f"--minting-script-file {mint.script}"] if nft_names else []
+    def build_raw_mint_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint, nft_policy_map, scripts_map):
+        mint_args = []
+        if nft_policy_map:
+            named_asset_str = CardanoCli.named_assets_str(nft_policy_map)
+            mint_args.append(f"--mint=\"{named_asset_str}\"")
+            mint_args.extend([f"--minting-script-file {scripts_map[script]}" for script in scripts_map if script in nft_policy_map])
         if mint.initial_slot:
             mint_args.append(f"--invalid-before {mint.initial_slot}")
         if mint.expiration_slot:
@@ -60,3 +70,17 @@ class CardanoCli(object):
             f'transaction sign {signing_key_args} --tx-body-file {build_file} --out-file {signed_file}'
         )
         return signed_file
+
+    def build_addr(self, payment_sign_key, mainnet=False):
+        with tempfile.NamedTemporaryFile() as verification_file:
+            self.__run_script(
+                f"key verification-key --signing-key-file {payment_sign_key} --verification-key-file {verification_file.name}"
+            )
+            network_flag = "--mainnet" if mainnet else f"--testnet-magic {network.PREPROD_MAGIC}"
+            address = self.__run_script(
+                f"address build --payment-verification-key-file {verification_file.name} {network_flag}"
+            )
+            return address.strip()
+
+    def policy_id(self, script_file):
+        return self.__run_script(f"transaction policyid --script-file {script_file}").strip()

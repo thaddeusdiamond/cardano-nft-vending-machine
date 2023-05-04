@@ -89,7 +89,6 @@ def test_cli_smoke(request, vm_test_config, blockfrost_api, cardano_cli):
         '--mint-price', str(MINT_PRICE),
         '--mint-script', policy.script_file_path,
         '--mint-sign-key', policy_keys.skey_path,
-        '--mint-policy', policy.id,
         '--blockfrost-project', blockfrost_api.project,
         '--metadata-dir', vm_test_config.metadata_dir,
         '--output-dir', vm_test_config.root_dir,

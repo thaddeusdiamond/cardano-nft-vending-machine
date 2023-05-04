@@ -18,6 +18,21 @@ def create_asset_files(asset_names, policy, request, metadata_dir, test_prefix='
             cip_0025_out = {'721': { policy.id: sample_metadata_json }}
             json.dump(cip_0025_out, sample_metadata_out)
 
+def create_combined_pack(policy_asset_map, request, metadata_dir, test_prefix='smoketest'):
+    policy_metadata_map = {}
+    combined_name = ''
+    for policy in policy_asset_map:
+        asset_names = policy_asset_map[policy]
+        for asset_name in asset_names:
+            combined_name += asset_name
+            asset_file = asset_filename(asset_name)
+            sample_metadata_json = metadata_json(request, asset_file, test_prefix)
+            if not policy in policy_metadata_map:
+                policy_metadata_map[policy] = {}
+            policy_metadata_map[policy][asset_name] = sample_metadata_json[asset_name]
+    with open(os.path.join(metadata_dir, asset_filename(combined_name)), 'w') as sample_metadata_out:
+        json.dump({'721': policy_metadata_map}, sample_metadata_out)
+
 def hex_to_asset_name(asset_name_hex):
     return binascii.unhexlify(asset_name_hex).decode('utf-8')
 

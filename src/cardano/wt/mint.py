@@ -41,19 +41,20 @@ class Mint(object):
                     return validator[key]
         return None
 
-    def __init__(self, policy, price, dev_fee, dev_addr, nfts_dir, script, sign_key, whitelist, bogo=None):
-        self.policy = policy
+    def __init__(self, price, dev_fee, dev_addr, nfts_dir, scripts, sign_keys, whitelist, bogo=None):
         self.price = price
         self.dev_fee = dev_fee
         self.dev_addr = dev_addr
         self.nfts_dir = nfts_dir
-        self.script = script
-        self.sign_key = sign_key
+        self.scripts = scripts
+        self.sign_keys = sign_keys
         self.whitelist = whitelist
         self.bogo = bogo
 
-        self.initial_slot = Mint.__read_validator('after', 'slot', script)
-        self.expiration_slot = Mint.__read_validator('before', 'slot', script)
+        after_slots = list(filter(None, [Mint.__read_validator('after', 'slot', script) for script in self.scripts]))
+        self.initial_slot = min(after_slots) if after_slots else None
+        before_slots = list(filter(None, [Mint.__read_validator('before', 'slot', script) for script in self.scripts]))
+        self.expiration_slot = max(before_slots) if before_slots else None
 
     def validate(self):
         if self.dev_fee and self.dev_fee < Utxo.MIN_UTXO_VALUE:
@@ -66,13 +67,16 @@ class Mint(object):
         for filename in os.listdir(self.nfts_dir):
             with open(os.path.join(self.nfts_dir, filename), 'r') as file:
                 print(f"Validating '{filename}'")
-                validated_nft = self.__validated_nft(json.load(file), validated_names, filename)
-                validated_names.append(validated_nft)
+                validated_nfts = self.__validated_nft(json.load(file), validated_names, filename)
+                validated_names.extend(validated_nfts)
         self.validated_names = validated_names
-        if not os.path.exists(self.script):
-            raise ValueError(f"Minting script file '{self.script}' not found on filesystem")
-        if not os.path.exists(self.sign_key):
-            raise ValueError(f"Signing key file '{self.sign_key}' not found on filesystem")
+        for script in self.scripts:
+            if not os.path.exists(script):
+                raise ValueError(f"Minting script file '{script}' not found on filesystem")
+        for sign_key in self.sign_keys:
+            if not os.path.exists(sign_key):
+                raise ValueError(f"Signing key file '{sign_key}' not found on filesystem")
+        self.policies = list(set([nft_name.split('.')[0] for nft_name in self.validated_names]))
         print(f"Validating whitelist of type {self.whitelist.__class__}")
         self.whitelist.validate()
 
@@ -94,20 +98,19 @@ class Mint(object):
         nft_policy_obj = nft[Mint._METADATA_KEY]
         if len(nft_policy_obj.keys()) == 0:
             raise ValueError(f"No policy keys found in file '{filename}'")
-        if len(nft_policy_obj.keys()) > 2:
-            raise ValueError(f"Too many policy keys ({len(nft_policy_obj.keys())}) found in file '{filename}'")
-        if len(nft_policy_obj.keys()) == 2 and not 'version' in nft_policy_obj.keys():
-            raise ValueError(f"Found 2 keys but 1 is not 'version' (file '{filename}') [see CIP-0025]")
-        policy = sorted(list(nft_policy_obj.keys()))[0]
-        if len(policy) != Mint._POLICY_LEN:
-            raise ValueError(f"Incorrect looking policy {policy} in file '{filename}'")
-        if policy != self.policy:
-            raise ValueError(f"Encountered asset with policy {policy} different from vending machine start value {self.policy}")
-        asset_obj = nft_policy_obj[policy]
-        if len(asset_obj.keys()) != 1:
-            raise ValueError(f"Incorrect # of assets ({len(asset_obj.keys())}) found in file '{filename}'")
-        asset_name = list(asset_obj.keys())[0]
-        if asset_name in existing:
-            raise ValueError(f"Found duplicate asset name '{asset_name}' in file '{filename}'")
-        self.__validate_str_lengths(asset_obj)
-        return asset_name
+        asset_names = []
+        for policy in nft_policy_obj:
+            if policy == 'version':
+                continue
+            if len(policy) != Mint._POLICY_LEN:
+                raise ValueError(f"Incorrect looking policy {policy} in file '{filename}'")
+            asset_obj = nft_policy_obj[policy]
+            if len(asset_obj.keys()) == 0:
+                raise ValueError(f"Need at least 1 asset for policy '{policy}' in file '{filename}'")
+            asset_name = list(asset_obj.keys())[0]
+            full_name = f"{policy}.{asset_name}"
+            if full_name in existing:
+                raise ValueError(f"Found duplicate asset name '{full_name}' in file '{filename}'")
+            self.__validate_str_lengths(asset_obj)
+            asset_names.append(full_name)
+        return asset_names

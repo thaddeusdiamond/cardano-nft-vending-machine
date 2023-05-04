@@ -112,9 +112,8 @@ def get_parser():
     parser.add_argument('--payment-addr', required=True, help='Cardano address where mint payments are sent to')
     parser.add_argument('--payment-sign-key', required=True, help='Location on disk of wallet signing keys for payment landing zone')
     parser.add_argument('--profit-addr', required=True, help='Cardano address where mint profits should be taken (NOTE: HARDWARE/LEDGER RECOMMENDED)')
-    parser.add_argument('--mint-policy', required=True, help='Policy ID of the mint being performed')
-    parser.add_argument('--mint-script', required=True, help='Local path of scripting file for mint')
-    parser.add_argument('--mint-sign-key', required=True, help='Location on disk of signing keys used for the mint')
+    parser.add_argument('--mint-script', required=True, action='append', help='Local path(s) of scripting file for mint (repeat for multiple policies)')
+    parser.add_argument('--mint-sign-key', required=True, action='append', help='Location on disk of minting signing key(s) (validated on launch)')
     parser.add_argument('--metadata-dir', required=True, help='Local folder where Cardano NFT metadata (e.g., 721s) are stored')
     parser.add_argument('--output-dir', required=True, help='Local folder where vending machine output stored')
     parser.add_argument('--blockfrost-project', required=True, help='Blockfrost project ID to use for retrieving chain data')
@@ -149,7 +148,7 @@ if __name__ == "__main__":
     _whitelist = get_whitelist_type(_args, os.path.join(_args.output_dir, WL_CONSUMED_DIR_SUBDIR))
     _dev_fee = _args.dev_fee if _args.dev_fee else 0
     _bogo = Bogo(_args.bogo[0], _args.bogo[1]) if _args.bogo else None
-    _mint = Mint(_args.mint_policy, _mint_price, _dev_fee, _args.dev_addr, _args.metadata_dir, _args.mint_script, _args.mint_sign_key, _whitelist, _bogo)
+    _mint = Mint(_mint_price, _dev_fee, _args.dev_addr, _args.metadata_dir, _args.mint_script, _args.mint_sign_key, _whitelist, _bogo)
 
     _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet, preview=_args.preview)
 

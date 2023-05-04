@@ -86,13 +86,12 @@ def test_concurrent_wallet_usage(request, vm_test_config, blockfrost_api, cardan
             get_network_magic()
     )
     mint = Mint(
-            policy.id,
             mint_price,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
-            policy.script_file_path,
-            policy_keys.skey_path,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
             NoWhitelist()
     )
     profit = Address.new(
