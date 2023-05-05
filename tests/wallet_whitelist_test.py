@@ -514,6 +514,125 @@ def test_rejects_if_msg_stakesign_empty(request, vm_test_config, blockfrost_api,
     )
     await_payment(funder.address, drain_txn, blockfrost_api)
 
+def test_rejects_if_address_signed_but_not_whitelisted(request, vm_test_config, blockfrost_api, cardano_cli):
+    buyer = Address.new(
+            vm_test_config.buyers_dir,
+            'buyer',
+            get_network_magic()
+    )
+    buyer_skey = StakeSigningKey.load(buyer.keypair.skey_path)
+    signed_msg = cip8.sign(buyer.address, buyer_skey, attach_cose_key=True, network=get_pycardano_network())
+    stringified_msg = json.dumps(signed_msg)
+    metadata = {'674': {'whitelist_proof': chunked_str(stringified_msg)}}
+
+    wl_buyer = Address.new(
+            vm_test_config.buyers_dir,
+            'wl_buyer',
+            get_network_magic()
+    )
+
+    initialize_whitelist(request, vm_test_config, vm_test_config.whitelist_dir, vm_test_config.consumed_dir, [wl_buyer])
+    whitelist = WalletWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
+    assert whitelist.num_whitelisted(wl_buyer.address) == 1, f"{wl_buyer.address} should be on the whitelist"
+
+    funder = get_funder_address(request)
+    funding_utxos = blockfrost_api.get_utxos(funder.address, [])
+    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
+    funding_amt = MINT_PRICE + PADDING
+    funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
+    funding_request_txn = send_money(
+            [buyer],
+            funding_amt,
+            funder,
+            funding_inputs,
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+    buyer_utxo = await_payment(buyer.address, funding_request_txn, blockfrost_api)
+
+    payment = Address.new(
+            vm_test_config.payees_dir,
+            'payment',
+            get_network_magic()
+    )
+    mint_payment = lovelace_in(buyer_utxo)
+    payment_txn = send_money(
+            [payment],
+            mint_payment,
+            buyer,
+            [buyer_utxo],
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir,
+            metadata=metadata
+    )
+    payment_utxo = await_payment(payment.address, payment_txn, blockfrost_api)
+
+    policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
+    policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
+    mint = Mint(
+            MINT_PRICE,
+            DEV_FEE_AMT,
+            DEV_FEE_ADDR,
+            vm_test_config.metadata_dir,
+            [policy.script_file_path],
+            [policy_keys.skey_path],
+            whitelist
+    )
+    profit = Address.new(
+            vm_test_config.payees_dir,
+            'profit',
+            get_network_magic()
+    )
+    nft_vending_machine = NftVendingMachine(
+            payment.address,
+            payment.keypair.skey_path,
+            profit.address,
+            VEND_RANDOMLY,
+            SINGLE_VEND_MAX,
+            mint,
+            blockfrost_api,
+            cardano_cli,
+            mainnet=get_mainnet_env()
+    )
+    nft_vending_machine.validate()
+
+    asset_name = "WildTangz 1"
+    create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
+
+    assert whitelist.num_whitelisted(buyer.address) == 0, f"{buyer.address} should NOT be on the whitelist"
+    nft_vending_machine.vend(
+            vm_test_config.root_dir,
+            vm_test_config.locked_dir,
+            vm_test_config.txn_metadata_dir,
+            set()
+    )
+    assert whitelist.num_whitelisted(buyer.address) == 0, f"{buyer.address} should NOT be on the whitelist"
+
+    try:
+        await_payment(profit.address, None, blockfrost_api)
+        assert False, f"{profit.address} was paid, but should not have been"
+    except:
+        pass
+
+    assert policy_is_empty(policy, blockfrost_api), f"Somehow the test created assets under {policy.id}"
+
+    assert whitelist.num_whitelisted(wl_buyer.address) == 1, f"{wl_buyer.address} should have remained on the whitelist"
+
+    minter_utxo = await_payment(buyer.address, None, blockfrost_api)
+    drain_payment = lovelace_in(minter_utxo)
+    drain_txn = send_money(
+            [funder],
+            drain_payment,
+            buyer,
+            [minter_utxo],
+            cardano_cli,
+            blockfrost_api,
+            vm_test_config.root_dir
+    )
+    await_payment(funder.address, drain_txn, blockfrost_api)
+
 def test_rejects_if_stake_signed_but_not_whitelisted(request, vm_test_config, blockfrost_api, cardano_cli):
     buyer = Address.new_staked(
             vm_test_config.buyers_dir,
