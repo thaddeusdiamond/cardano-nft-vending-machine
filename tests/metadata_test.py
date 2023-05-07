@@ -48,8 +48,8 @@ def test_uses_earliest_and_latest_slots(request, vm_test_config):
     sign_key = data_file_path(request, os.path.join('sign_keys', 'dummy.skey'))
     mint = Mint(None, None, None, vm_test_config.metadata_dir, [simple_script, simple_two_script], [sign_key], NoWhitelist())
     mint.validate()
-    assert mint.initial_slot == 12345678
-    assert mint.expiration_slot == 98765432
+    assert mint.initial_slot == 23456789
+    assert mint.expiration_slot == 87654321
 
 def test_uses_earliest_and_latest_slots_with_none(request, vm_test_config):
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))

@@ -52,9 +52,9 @@ class Mint(object):
         self.bogo = bogo
 
         after_slots = list(filter(None, [Mint.__read_validator('after', 'slot', script) for script in self.scripts]))
-        self.initial_slot = min(after_slots) if after_slots else None
+        self.initial_slot = max(after_slots) if after_slots else None
         before_slots = list(filter(None, [Mint.__read_validator('before', 'slot', script) for script in self.scripts]))
-        self.expiration_slot = max(before_slots) if before_slots else None
+        self.expiration_slot = min(before_slots) if before_slots else None
 
     def validate(self):
         if self.dev_fee and self.dev_fee < Utxo.MIN_UTXO_VALUE:
