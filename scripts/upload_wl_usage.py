@@ -6,8 +6,11 @@ import os
 import subprocess
 import sys
 
+NUM_CONSUMED = 'used_num'
 CONSUMED_KEY = 'used_ids'
+NUM_REMAINING = 'unused_num'
 WHITELIST_KEY = 'unused_ids'
+NUM_TOTAL = 'total_num'
 
 def upload_to_cloudflare(out_file, cloudflare_args):
     env_copy = os.environ.copy()
@@ -34,7 +37,13 @@ def write_to_local(whitelist, out_file):
 def load_new_whitelist(consumed_dir, whitelist_dir):
     consumed_files = os.listdir(consumed_dir) if os.path.exists(consumed_dir) else []
     whitelist_files = os.listdir(whitelist_dir) if os.path.exists(whitelist_dir) else []
-    return { CONSUMED_KEY: consumed_files, WHITELIST_KEY: whitelist_files }
+    return {
+        NUM_CONSUMED: len(consumed_files),
+        NUM_REMAINING: len(whitelist_files),
+        NUM_TOTAL: len(consumed_files) + len(whitelist_files),
+        CONSUMED_KEY: consumed_files,
+        WHITELIST_KEY: whitelist_files
+    }
 
 def load_existing_whitelist(old_wl_file):
     if not os.path.exists(old_wl_file):
