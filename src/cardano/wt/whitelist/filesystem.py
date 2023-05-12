@@ -30,7 +30,7 @@ class FilesystemBasedWhitelist(object):
                 linked_id_paths = []
                 with open(identifier_location, 'r') as linked_ids:
                     for linked_id in linked_ids:
-                        linked_id_path = os.path.join(self.input_dir, linked_id)
+                        linked_id_path = os.path.join(self.input_dir, linked_id.strip())
                         if not os.path.exists(linked_id_path):
                             print(f"Linked ID {linked_id} was not on whitelist, skipping...")
                             continue
