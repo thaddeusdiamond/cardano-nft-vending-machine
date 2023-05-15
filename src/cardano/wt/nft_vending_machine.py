@@ -111,6 +111,7 @@ class NftVendingMachine(object):
             num_mints = 0
 
         gross_profit = num_mints * self.mint.price
+        dev_fee = num_mints * self.mint.dev_fee
         change = lovelace_bal.lovelace - gross_profit
 
         if self.mint.bogo:
@@ -126,7 +127,6 @@ class NftVendingMachine(object):
         all_names = [name for name_lst in nft_policy_map.values() for name in name_lst]
         total_name_chars = sum([len(name) for name in all_names])
         user_rebate = Mint.RebateCalculator.calculate_rebate_for(len(nft_policy_map.keys()), len(all_names), total_name_chars) if self.mint.price else 0
-        dev_fee = num_mints * self.mint.dev_fee
         net_profit = gross_profit - dev_fee - user_rebate
         print(f"Minimum rebate to user is {user_rebate}, net profit to vault is {net_profit}")
 
