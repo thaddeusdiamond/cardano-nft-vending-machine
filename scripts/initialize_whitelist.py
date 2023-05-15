@@ -18,14 +18,14 @@ def make_nonexistent_dir(dir):
 def get_network_flag(mainnet):
     return network.Network.MAINNET if mainnet else network.Network.TESTNET
 
-def create_whitelist_file(identifier, linked_ids, whitelist_dir, num_mints_per_wl):
+def create_whitelist_file(identifier, linked_ids, whitelist_dir, prefix, num_mints_per_wl):
     identifier_path = os.path.join(whitelist_dir, identifier)
     for slot in range(1, num_mints_per_wl + 1):
-        identifier_slot_path = f"{identifier_path}_{slot}"
+        identifier_slot_path = f"{identifier_path}_{prefix if prefix else ''}{slot}"
         if os.path.exists(identifier_slot_path):
             raise ValueError(f"Found duplicate identifier in input: {identifier}")
         with open(identifier_slot_path, 'a') as identifier_file:
-            linked_ids_contents = '\n'.join([f"{linked_id}_{slot}" for linked_id in linked_ids])
+            linked_ids_contents = '\n'.join([f"{linked_id}_{prefix if prefix else ''}{slot}" for linked_id in linked_ids])
             identifier_file.write(linked_ids_contents)
 
 def get_stake_key(identifier, blockfrost_api, mainnet):
@@ -69,6 +69,7 @@ def get_parser():
         subparser.add_argument('--consumed-dir', required=True, help='Local folder where consumed whitelist files will go after processing (MUST NOT YET EXIST)')
         subparser.add_argument('--whitelist-dir', required=True, help='Local folder where whitelist files are stored (MUST NOT YET EXIST)')
         subparser.add_argument('--num-mints-per-wl', required=True, type=int, help='How many whitelist slots should be given for each asset')
+        subparser.add_argument('--prefix', required=False, help='Optional (needs to be integer) prefix for whitelist file IDs')
 
     return parser
 
@@ -80,14 +81,21 @@ if __name__ == "__main__":
     blockfrost_api = BlockFrostApi(project_id=args.blockfrost_project, base_url=base_api.value)
     if args.command == 'asset':
         for asset in blockfrost_api.assets_policy(args.policy_id):
-            create_whitelist_file(asset.asset, [], args.whitelist_dir, args.num_mints_per_wl)
+            create_whitelist_file(asset.asset, [], args.whitelist_dir, args.prefix, args.num_mints_per_wl)
     elif args.command == 'wallet':
         for line in open(args.wallet_file, 'r'):
-            identifiers = line.strip().split(',')
+            identifiers = None
+            num_mints = args.num_mints_per_wl
+            if ':' in line:
+                ids_num = line.strip().split(':')
+                num_mints = int(ids_num[1])
+                identifiers = ids_num[0].split(',')
+            else:
+                identifiers = line.strip().split(',')
             for idx in range(len(identifiers)):
                 raw_id = identifiers[idx]
                 stake_id = get_stake_key(raw_id, blockfrost_api, args.mainnet)
                 other_ids = [get_stake_key(other_id, blockfrost_api, args.mainnet) for other_id in identifiers if other_id != raw_id]
-                create_whitelist_file(stake_id, other_ids, args.whitelist_dir, args.num_mints_per_wl)
+                create_whitelist_file(stake_id, other_ids, args.whitelist_dir, args.prefix, num_mints)
     else:
         raise ValueError(f"Unexpected command {args.command}")
