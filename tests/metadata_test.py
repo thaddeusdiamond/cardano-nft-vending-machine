@@ -171,6 +171,8 @@ def test_allows_if_not_exactly_one_asset(request, vm_test_config):
     dupe_file = data_file_path(request, os.path.join('bad_format', 'dupe_bad.json'))
     shutil.copy(dupe_file, vm_test_config.metadata_dir)
     mint.validate()
+    assets_expected = ['33568ad11f93b3e79ae8dee5ad928ded72adcea719e92108caf1521b.WildTangz 456', '33568ad11f93b3e79ae8dee5ad928ded72adcea719e92108caf1521b.WildTangz Foo']
+    assert mint.validated_names == assets_expected, f"Mint did not capture all names in {mint.validated_names}"
 
 def test_rejects_lengthy_metadata(request, vm_test_config):
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
@@ -181,7 +183,7 @@ def test_rejects_lengthy_metadata(request, vm_test_config):
         mint.validate()
         assert False, 'Successfully validated mint with lengthy metadata'
     except ValueError as e:
-        assert "Encountered metadata value >64 chars 'This clothing explanation is way way way " in str(e)
+        assert "Encountered metadata value >64 chars 'This length explanation passes without utf-8 encoding ☀☁☂☃©" in str(e)
 
 def test_rejects_nested_lengthy_metadata(request, vm_test_config):
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))

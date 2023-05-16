@@ -10,7 +10,7 @@
         "eyes": "Winking",
         "eyewear": "None",
         "headwear": "Bandana",
-        "clothing": "This clothing explanation is way way way too long and it should not",
+        "clothing": "This length explanation passes without utf-8 encoding ☀☁☂☃©",
         "mouth": "Beer",
         "name": "WildTangz 456",
         "background": "Fountain Blue",

@@ -87,7 +87,7 @@ class Mint(object):
         if type(metadata) is list:
             for value in metadata:
                 self.__validate_str_lengths(value)
-        if type(metadata) is str and len(metadata) > Mint._METADATA_MAXLEN:
+        if type(metadata) is str and len(metadata.encode('utf-8')) > Mint._METADATA_MAXLEN:
             raise ValueError(f"Encountered metadata value >{Mint._METADATA_MAXLEN} chars '{metadata}'")
 
     def __validated_nft(self, nft, existing, filename):
@@ -107,10 +107,10 @@ class Mint(object):
             asset_obj = nft_policy_obj[policy]
             if len(asset_obj.keys()) == 0:
                 raise ValueError(f"Need at least 1 asset for policy '{policy}' in file '{filename}'")
-            asset_name = list(asset_obj.keys())[0]
-            full_name = f"{policy}.{asset_name}"
-            if full_name in existing:
-                raise ValueError(f"Found duplicate asset name '{full_name}' in file '{filename}'")
-            self.__validate_str_lengths(asset_obj)
-            asset_names.append(full_name)
+            for asset_name in asset_obj:
+                full_name = f"{policy}.{asset_name}"
+                if full_name in existing:
+                    raise ValueError(f"Found duplicate asset name '{full_name}' in file '{filename}'")
+                self.__validate_str_lengths(asset_obj)
+                asset_names.append(full_name)
         return asset_names
