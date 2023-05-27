@@ -86,7 +86,7 @@ def test_cli_smoke(request, vm_test_config, blockfrost_api, cardano_cli):
         '--payment-addr', payment.address,
         '--payment-sign-key', payment.keypair.skey_path,
         '--profit-addr', profit.address,
-        '--mint-price', str(MINT_PRICE),
+        '--mint-price', str(MINT_PRICE), 'lovelace',
         '--mint-script', policy.script_file_path,
         '--mint-sign-key', policy_keys.skey_path,
         '--blockfrost-project', blockfrost_api.project,

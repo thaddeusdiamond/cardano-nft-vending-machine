@@ -12,12 +12,14 @@ from test_utils.fs import data_file_path, protocol_file_path
 from test_utils.metadata import create_asset_files
 
 from cardano.wt.mint import Mint
+from cardano.wt.utxo import Balance
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
 DEV_FEE_AMT = 2000000
 EXPIRATION = 87654321
 MINT_PRICE = 10000000
+MINT_PRICES = [Balance(MINT_PRICE, Balance.LOVELACE_POLICY)]
 SINGLE_VEND_MAX = 10
 VEND_RANDOMLY = True
 
@@ -25,7 +27,7 @@ PADDING = 500000
 
 def test_invalid_dev_fees_fail_validation(request, vm_test_config):
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(MINT_PRICE, 500000, None, vm_test_config.metadata_dir, [simple_script], None, None)
+    mint = Mint(MINT_PRICES, 500000, None, vm_test_config.metadata_dir, [simple_script], None, None)
     try:
         mint.validate()
         assert False, "Successfully validated mint with too small of dev fee"
@@ -34,7 +36,7 @@ def test_invalid_dev_fees_fail_validation(request, vm_test_config):
 
 def test_invalid_dev_addr_fails_validation(request, vm_test_config):
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
-    mint = Mint(MINT_PRICE, DEV_FEE_AMT, None, vm_test_config.metadata_dir, [simple_script], None, None)
+    mint = Mint(MINT_PRICES, DEV_FEE_AMT, None, vm_test_config.metadata_dir, [simple_script], None, None)
     try:
         mint.validate()
         assert False, "Successfully validated mint with no dev fee address"
@@ -89,7 +91,7 @@ def test_dev_fees_are_not_paid_with_no_mint(request, vm_test_config, blockfrost_
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             developer.address,
             vm_test_config.metadata_dir,
@@ -196,7 +198,7 @@ def test_dev_fee_works(request, vm_test_config, blockfrost_api, cardano_cli):
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             developer.address,
             vm_test_config.metadata_dir,

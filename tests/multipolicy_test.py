@@ -15,6 +15,7 @@ from test_utils.policy import Policy, new_policy_for
 from test_utils.vending_machine import vm_test_config
 
 from cardano.wt.mint import Mint
+from cardano.wt.utxo import Balance
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
@@ -22,6 +23,7 @@ DEV_FEE_ADDR = None
 DEV_FEE_AMT = 0
 EXPIRATION = 87654321
 MINT_PRICE = 10 * 1000000
+MINT_PRICES = [Balance(MINT_PRICE, Balance.LOVELACE_POLICY)]
 PADDING = 1500000
 SINGLE_VEND_MAX = 30
 VEND_RANDOMLY = False
@@ -88,7 +90,7 @@ def test_mints_multiple_policies_in_sequence(request, vm_test_config, blockfrost
     create_asset_files(policy_two_names, policy_two, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -243,7 +245,7 @@ def test_mints_multiple_policies_in_same_pack_file(request, vm_test_config, bloc
     }, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,

@@ -18,6 +18,7 @@ from test_utils.metadata import asset_filename, asset_name_hex, create_asset_fil
 
 from cardano.wt.bonuses.bogo import Bogo
 from cardano.wt.mint import Mint
+from cardano.wt.utxo import Balance
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
@@ -25,6 +26,7 @@ DEV_FEE_ADDR = None
 DEV_FEE_AMT = 0
 EXPIRATION = 87654321
 MINT_PRICE = 10 * 1000000
+MINT_PRICES = [Balance(MINT_PRICE, Balance.LOVELACE_POLICY)]
 PADDING = 500000
 SINGLE_VEND_MAX = 30
 VEND_RANDOMLY = True
@@ -79,7 +81,7 @@ def test_does_not_bonus_below_threshold(request, vm_test_config, blockfrost_api,
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -217,7 +219,7 @@ def test_bonuses_single_or_multis(request, vm_test_config, blockfrost_api, carda
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -382,7 +384,7 @@ def test_honors_max_available(request, vm_test_config, blockfrost_api, cardano_c
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -528,7 +530,7 @@ def test_does_not_add_to_dev_fee(request, vm_test_config, blockfrost_api, cardan
 
     dev_fee_amt = int(MINT_PRICE * 0.1)
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             dev_fee_amt,
             developer.address,
             vm_test_config.metadata_dir,
@@ -686,7 +688,7 @@ def test_honors_single_vend_max(request, vm_test_config, blockfrost_api, cardano
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,

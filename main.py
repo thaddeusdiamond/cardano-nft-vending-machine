@@ -12,7 +12,7 @@ from cardano.wt.blockfrost import BlockfrostApi
 from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.mint import Mint
 from cardano.wt.nft_vending_machine import NftVendingMachine
-from cardano.wt.utxo import Utxo
+from cardano.wt.utxo import Utxo, Balance
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 from cardano.wt.whitelist.asset_whitelist import SingleUseWhitelist, UnlimitedWhitelist
 from cardano.wt.whitelist.wallet_whitelist import WalletWhitelist
@@ -98,17 +98,10 @@ def get_whitelist_type(args, wl_output_dir):
     if args.wallet_whitelist:
         return WalletWhitelist(args.wallet_whitelist, wl_output_dir)
 
-def get_mint_price(mint_price, free_mint):
-    assert(not (free_mint and mint_price))
-    return 0 if free_mint else mint_price
-
 def get_parser():
     parser = argparse.ArgumentParser(add_help=False)
 
-    price = parser.add_mutually_exclusive_group(required=True)
-    price.add_argument('--mint-price', type=int, help='Price in LOVELACE that is being charged for each NFT (min 5₳)')
-    price.add_argument('--free-mint', action='store_true', help='Perform a free mint (user gets a rebate of their ADA and receives "--single-vend-max")')
-
+    parser.add_argument('--mint-price', required=True, action='append', type=str, nargs=2, metavar=('PRICE', 'POLICY_ID'), help='PRICE of POLICY_ID asset being charged for each NFT (min 5₳ for lovelace if not 0₳)')
     parser.add_argument('--payment-addr', required=True, help='Cardano address where mint payments are sent to')
     parser.add_argument('--payment-sign-key', required=True, help='Location on disk of wallet signing keys for payment landing zone')
     parser.add_argument('--profit-addr', required=True, help='Cardano address where mint profits should be taken (NOTE: HARDWARE/LEDGER RECOMMENDED)')
@@ -144,11 +137,11 @@ if __name__ == "__main__":
     seed_random()
     ensure_output_dirs_made(_args.output_dir)
 
-    _mint_price = get_mint_price(_args.mint_price, _args.free_mint)
+    _mint_prices = [Balance(int(mint[0]), mint[1]) for mint in _args.mint_price]
     _whitelist = get_whitelist_type(_args, os.path.join(_args.output_dir, WL_CONSUMED_DIR_SUBDIR))
     _dev_fee = _args.dev_fee if _args.dev_fee else 0
     _bogo = Bogo(_args.bogo[0], _args.bogo[1]) if _args.bogo else None
-    _mint = Mint(_mint_price, _dev_fee, _args.dev_addr, _args.metadata_dir, _args.mint_script, _args.mint_sign_key, _whitelist, _bogo)
+    _mint = Mint(_mint_prices, _dev_fee, _args.dev_addr, _args.metadata_dir, _args.mint_script, _args.mint_sign_key, _whitelist, _bogo)
 
     _blockfrost_api = BlockfrostApi(_args.blockfrost_project, mainnet=_args.mainnet, preview=_args.preview)
 

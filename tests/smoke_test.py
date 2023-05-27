@@ -1,9 +1,4 @@
-import json
-import os
 import pytest
-import signal
-import sys
-import time
 
 from test_utils.address import Address
 from test_utils.keys import KeyPair
@@ -17,6 +12,7 @@ from test_utils.fs import protocol_file_path
 from test_utils.metadata import asset_filename, asset_name_hex, create_asset_files, hex_to_asset_name, metadata_json
 
 from cardano.wt.mint import Mint
+from cardano.wt.utxo import Balance
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
@@ -24,6 +20,7 @@ DEV_FEE_ADDR = None
 DEV_FEE_AMT = 0
 EXPIRATION = 87654321
 MINT_PRICE = 10 * 1000000
+MINT_PRICES = [Balance(MINT_PRICE, Balance.LOVELACE_POLICY)]
 PADDING = 500000
 SINGLE_VEND_MAX = 30
 VEND_RANDOMLY = True
@@ -37,7 +34,7 @@ def test_mints_nothing_when_no_payment(request, vm_test_config, blockfrost_api, 
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -122,7 +119,7 @@ def test_skips_exclusion_utxos(request, vm_test_config, blockfrost_api, cardano_
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -212,7 +209,7 @@ def test_blacklists_min_utxo_errors(request, vm_test_config, blockfrost_api, car
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -301,7 +298,7 @@ def test_mints_single_asset(request, vm_test_config, blockfrost_api, cardano_cli
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -422,7 +419,7 @@ def test_mints_restocked_nfts(request, vm_test_config, blockfrost_api, cardano_c
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -577,7 +574,7 @@ def test_mints_multiple_assets(request, vm_test_config, blockfrost_api, cardano_
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -714,7 +711,7 @@ def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api, car
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -788,7 +785,7 @@ def test_refunds_overages_correctly(request, vm_test_config, blockfrost_api, car
 
     assert policy_is_empty(policy, blockfrost_api), f"Burned asset successfully but {policy.id} has remaining_assets"
 
-def test_blacklists_too_little_correctly(request, vm_test_config, blockfrost_api, cardano_cli):
+def test_marks_too_little_as_a_refund_correctly(request, vm_test_config, blockfrost_api, cardano_cli):
     funder = get_funder_address(request)
     funding_utxos = blockfrost_api.get_utxos(funder.address, [])
     print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
@@ -835,7 +832,7 @@ def test_blacklists_too_little_correctly(request, vm_test_config, blockfrost_api
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -873,28 +870,21 @@ def test_blacklists_too_little_correctly(request, vm_test_config, blockfrost_api
 
     try:
         profit_utxo = await_payment(profit.address, None, blockfrost_api)
-        assert False, 'Found profit when only blacklist expected: {profit_utxo}'
-    except ValueError:
-        pass
-
-    try:
-        buyer_utxo = await_payment(buyer.address, None, blockfrost_api)
-        assert False, 'Found profit when only blacklist expected: {buyer_utxo}'
+        assert False, 'Found profit when only refund expected: {profit_utxo}'
     except ValueError:
         pass
 
     created_assets = blockfrost_api.get_assets(policy.id)
     assert not created_assets, f"Somehow the test created assets under {policy.id}: {created_assets}"
 
-    minted_asset = blockfrost_api.get_asset(f"{policy.id}{asset_name_hex(asset_name)}")
-    assert not minted_asset, f"Somehow the test created {asset_name} in policy {policy.id}"
-
-    drain_payment = lovelace_in(payment_utxo)
+    minter_utxo = await_payment(buyer.address, None, blockfrost_api)
+    drain_payment = lovelace_in(minter_utxo)
+    assert drain_payment < funding_amt, f"Refund not processed for {minter_utxo}"
     drain_txn = send_money(
             [funder],
             drain_payment,
-            payment,
-            [payment_utxo],
+            buyer,
+            [minter_utxo],
             cardano_cli,
             blockfrost_api,
             vm_test_config.root_dir
@@ -944,7 +934,7 @@ def test_refunds_when_metadata_empty(request, vm_test_config, blockfrost_api, ca
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script')
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1053,7 +1043,7 @@ def test_can_handle_multiple_input_addresses(request, vm_test_config, blockfrost
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1190,7 +1180,7 @@ def test_sends_asset_to_non_reference_input(request, vm_test_config, blockfrost_
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1304,7 +1294,7 @@ def test_processes_utxos_in_blockchain_order(request, vm_test_config, blockfrost
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,

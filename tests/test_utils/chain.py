@@ -4,7 +4,7 @@ import pytest
 import time
 
 from cardano.wt.cardano_cli import CardanoCli
-from cardano.wt.utxo import Utxo
+from cardano.wt.utxo import Utxo, Balance
 
 from test_utils.blockfrost import get_preview_env
 from test_utils.fs import protocol_file_path
@@ -32,9 +32,9 @@ def assets_are_empty(remaining_assets):
             return False
     return True
 
-def burn_and_reclaim_tada(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, era='--alonzo-era', additional_keys=[]):
-    burn_units = [f"{policy.id}{asset_name_hex(asset_name)}" for asset_name in asset_names]
-    burn_names = '+'.join(['.'.join([f"-1 {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
+def burn_and_reclaim_tada(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, era='--alonzo-era', additional_keys=[], quantity=1):
+    burn_units = [(quantity, f"{policy.id}{asset_name_hex(asset_name)}") for asset_name in asset_names]
+    burn_names = '+'.join(['.'.join([f"-{quantity} {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
     return mint_assets_directly(burn_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, burned=burn_units, era=era, additional_keys=additional_keys)
 
 def calculate_remainder_str(lovelace_requested, num_receivers, utxo_inputs, burned, additional_outputs):
@@ -44,13 +44,14 @@ def calculate_remainder_str(lovelace_requested, num_receivers, utxo_inputs, burn
             if not balance.policy in total_qty:
                 total_qty[balance.policy] = 0
             total_qty[balance.policy] += balance.lovelace
-    total_qty[Utxo.Balance.LOVELACE_POLICY] -= lovelace_requested * num_receivers
-    for asset_name in burned:
-        total_qty[asset_name] -= 1
+    total_qty[Balance.LOVELACE_POLICY] -= lovelace_requested * num_receivers
+    for (asset_qty, asset_name) in burned:
+        total_qty[asset_name] -= asset_qty
     for qty_asset_name in filter(None, additional_outputs.split('+')):
-        hex_asset_name = ''.join(qty_asset_name.split(' ')[1].split('.'))
+        (qty, qualified_asset_name) = qty_asset_name.split(' ')
+        hex_asset_name = ''.join(qualified_asset_name.split('.'))
         if hex_asset_name in total_qty:
-            total_qty[hex_asset_name] -= 1
+            total_qty[hex_asset_name] -= int(qty)
     units_qtys = []
     for (unit, qty) in total_qty.items():
         if qty:
@@ -58,13 +59,13 @@ def calculate_remainder_str(lovelace_requested, num_receivers, utxo_inputs, burn
     return '+'.join(units_qtys) if units_qtys else None
 
 def cardano_cli_name(unit):
-    return f"{unit[0:56]}.{unit[56:]}" if unit != Utxo.Balance.LOVELACE_POLICY else ''
+    return f"{unit[0:56]}.{unit[56:]}" if unit != Balance.LOVELACE_POLICY else ''
 
 def get_params_file():
     return 'preview.json' if get_preview_env() else 'preprod.json'
 
-def mint_assets(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir):
-    mint_names = '+'.join(['.'.join([f"1 {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
+def mint_assets(asset_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, quantity=1):
+    mint_names = '+'.join(['.'.join([f"{quantity} {policy.id}", asset_name_hex(asset_name)]) for asset_name in asset_names])
     return mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs=mint_names)
 
 def mint_assets_directly(mint_names, policy, policy_keys, expiration, receiver, requested, sender, utxo_inputs, cardano_cli, blockfrost_api, output_dir, outputs='', burned=[], era='--alonzo-era', additional_keys=[]):
@@ -105,7 +106,7 @@ def lovelace_in(utxo, policy=None, asset_name=None):
     if policy:
         unit_name = f"{policy.id}{asset_name_hex(asset_name)}"
     else:
-        unit_name = Utxo.Balance.LOVELACE_POLICY
+        unit_name = Balance.LOVELACE_POLICY
     for balance in utxo.balances:
         if balance.policy == unit_name:
             return balance.lovelace

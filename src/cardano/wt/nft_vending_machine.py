@@ -1,3 +1,4 @@
+import copy
 import json
 import math
 import os
@@ -8,7 +9,7 @@ import traceback
 
 from cardano.wt.cardano_cli import CardanoCli
 from cardano.wt.mint import Mint
-from cardano.wt.utxo import Utxo
+from cardano.wt.utxo import Utxo, Balance
 
 class BadUtxoError(ValueError):
 
@@ -36,12 +37,16 @@ class NftVendingMachine(object):
         self.mainnet = mainnet
         self.__is_validated = False
 
-    def __get_tx_out_args(self, input_addr, change, nft_policy_map, total_profit, total_dev_fee):
-        user_tokens = filter(None, [input_addr, str(change), CardanoCli.named_assets_str(nft_policy_map)])
-        user_output = f"--tx-out \"{'+'.join(user_tokens)}\""
-        profit_output = f"--tx-out \"{self.profit_addr}+{total_profit}\"" if total_profit else ''
-        dev_output = f"--tx-out \"{self.mint.dev_addr}+{total_dev_fee}\"" if total_dev_fee else ''
-        return [user_output, profit_output, dev_output]
+    def __get_tx_out_args(self, payees):
+        tx_outs = []
+        for payee in payees:
+            payouts = payees[payee]
+            if not payee or not payouts:
+                continue
+            payout_str = '+'.join([f"{payouts[policy]} {policy}" for policy in payouts if payouts[policy]])
+            if payout_str:
+                tx_outs.append(f'--tx-out "{payee}+{payout_str}"')
+        return tx_outs
 
     def __get_policy_name_map(self, metadata_file):
         nft_names = {}
@@ -74,6 +79,115 @@ class NftVendingMachine(object):
             json.dump({'721': combined_nft_metadata }, combined_metadata_handle)
         return combined_output_path
 
+    def __calculate_num_mints_requested(self, mint_req):
+        num_mints_requested = 0
+        for balance in mint_req.balances:
+            mint_rate = [price for price in self.mint.prices if self.__normalized_unit(balance.policy) == price.policy]
+            if not mint_rate:
+                continue
+            num_mints_requested += math.floor(balance.lovelace / mint_rate[0].lovelace) if mint_rate[0].lovelace else self.single_vend_max
+        return num_mints_requested
+
+    def __normalized_unit(self, policy):
+        if policy == Balance.LOVELACE_POLICY:
+            return policy
+        return f"{policy[0:Mint._POLICY_LEN]}.{policy[Mint._POLICY_LEN:]}"
+
+    def __get_pricing_breakdown(self, input_addr, num_mints, nft_policy_map, mint_req, fee):
+        payees = {input_addr: {}, self.profit_addr: {}, self.mint.dev_addr: {}}
+
+        # GET A COPY OF THE UTXOs TO TRACK THE PAYOUTS (PUT LOVELACE BEFORE NATIVE ASSETS)
+        print(f"Building pricing breakdown for {num_mints} NFTs being paid from {mint_req}")
+        remaining = copy.deepcopy(mint_req.balances)
+        remaining.sort(key=lambda balance: balance.policy)
+        remaining.reverse()
+        remaining_ada = [balance for balance in remaining if balance.policy == Balance.LOVELACE_POLICY][0]
+
+        # PAY THE CREATOR
+        remaining_to_payout = num_mints
+        for remainder in remaining:
+            unit = self.__normalized_unit(remainder.policy)
+            if not remaining_to_payout:
+                break
+            matching_price = [price for price in self.mint.prices if price.policy == unit]
+            if not matching_price:
+                continue
+            if not matching_price[0].lovelace:
+                num_paid_for = num_mints
+            else:
+                num_paid_for = min(remaining_to_payout, math.floor(remainder.lovelace / matching_price[0].lovelace))
+            total_paid = (num_paid_for * matching_price[0].lovelace)
+            print(f"Paid for {num_paid_for} NFTs using {total_paid} {unit}")
+            if not num_paid_for:
+                continue
+            remaining_to_payout -= num_paid_for
+            remainder.lovelace -= total_paid
+            if not unit in payees[self.profit_addr]:
+                payees[self.profit_addr][unit] = 0
+            payees[self.profit_addr][unit] += total_paid
+        if not Balance.LOVELACE_POLICY in payees[self.profit_addr]:
+            if payees[self.profit_addr]:
+                token_types = set([unit[0:Mint._POLICY_LEN] for unit in payees[self.profit_addr].keys()])
+                all_tokens = [bytes.fromhex(unit[(Mint._POLICY_LEN + 1):]).decode('UTF-8') for unit in payees[self.profit_addr].keys()]
+                total_token_chars = sum([len(token) for token in all_tokens])
+                profit_rebate = Mint.RebateCalculator.calculate_rebate_for(len(token_types), len(all_tokens), total_token_chars)
+                payees[self.profit_addr][Balance.LOVELACE_POLICY] = profit_rebate
+                remaining_ada.lovelace -= profit_rebate
+            else:
+                payees[self.profit_addr][Balance.LOVELACE_POLICY] = 0
+        profit_ada = payees[self.profit_addr][Balance.LOVELACE_POLICY]
+        if remaining_to_payout:
+            raise ValueError(f"Unable to match UTxO to payment for {num_mints} NFTs")
+
+        # PAY THE USER THE NFTs NEXT
+        for policy in nft_policy_map:
+            for nft_name in nft_policy_map[policy]:
+                hex_name = nft_name.encode('UTF-8').hex()
+                asset_name = f"{policy}.{hex_name}"
+                if not asset_name in payees[input_addr]:
+                    payees[input_addr][asset_name] = 0
+                payees[input_addr][asset_name] += 1
+
+        # PAY THE USER'S REBATE AFTER NFTs CALCULATED
+        all_names = [name for name_lst in nft_policy_map.values() for name in name_lst]
+        total_name_chars = sum([len(name) for name in all_names])
+        user_rebate = Mint.RebateCalculator.calculate_rebate_for(len(nft_policy_map.keys()), len(all_names), total_name_chars)
+        print(f"Minimum rebate to user is {user_rebate}")
+
+        # DEDUCT REBATES AND FEES FROM PROFIT IF ADA-ONLY MINT, OTHERWISE FROM USER
+        payees[input_addr][Balance.LOVELACE_POLICY] = user_rebate
+        if profit_ada and len(payees[self.profit_addr]) == 1:
+            payees[self.profit_addr][Balance.LOVELACE_POLICY] -= (user_rebate + fee)
+        elif user_rebate > remaining_ada.lovelace:
+            raise ValueError(f"USER SENT {remaining_ada.lovelace} WHICH CAN'T COVER REBATE OF {user_rebate} (FREE MINT?)")
+        else:
+            remaining_ada.lovelace -= (user_rebate + fee)
+
+        # PAY THE DEVELOPER (ADA ONLY)
+        if self.mint.dev_fee:
+            expected_dev_fee = num_mints * self.mint.dev_fee
+            if len(payees[self.profit_addr]) == 1:
+                actual_dev_fee = min([expected_dev_fee, profit_ada])
+                print(f"Paying developer {actual_dev_fee} lovelace")
+                dev_fee_diff = expected_dev_fee - actual_dev_fee
+                if dev_fee_diff:
+                    print(f"SOMETHING IS OFF: Expected dev fee ({expected_dev_fee}) greater than actual ({actual_dev_fee}) by {dev_fee_diff} lovelace")
+                payees[self.mint.dev_addr][Balance.LOVELACE_POLICY] = actual_dev_fee
+                payees[self.profit_addr][Balance.LOVELACE_POLICY] -= actual_dev_fee
+            else:
+                print(f"NATIVE TOKEN WARNING: Cannot pay dev fee for native token, need to credit {expected_dev_fee} lovelace ({num_mints} mints)")
+
+        # DRAIN THE REMAINDER TO THE USER
+        for remainder in remaining:
+            unit = self.__normalized_unit(remainder.policy)
+            if not remainder.lovelace:
+                continue
+            if not unit in payees[input_addr]:
+                payees[input_addr][unit] = 0
+            payees[input_addr][unit] += remainder.lovelace
+            remainder.lovelace = 0
+        return payees
+
     def __do_vend(self, mint_req, output_dir, locked_subdir, metadata_subdir):
         available_mints = sorted(os.listdir(self.mint.nfts_dir))
         if not available_mints:
@@ -81,18 +195,7 @@ class NftVendingMachine(object):
         elif self.vend_randomly:
             random.shuffle(available_mints)
 
-        non_lovelace_bals = [balance for balance in mint_req.balances if balance.policy != Utxo.Balance.LOVELACE_POLICY]
-        if non_lovelace_bals:
-            raise BadUtxoError(mint_req, f"Cannot accept non-lovelace balances as payment")
-
-        lovelace_bals = [balance for balance in mint_req.balances if balance.policy == Utxo.Balance.LOVELACE_POLICY]
-        if len(lovelace_bals) != 1:
-            raise BadUtxoError(mint_req, f"Found too many/few lovelace balances for UTXO {mint_req}")
-
-        lovelace_bal = lovelace_bals.pop()
-        num_mints_requested = math.floor(lovelace_bal.lovelace / self.mint.price) if self.mint.price else self.single_vend_max
-        if not num_mints_requested:
-            raise BadUtxoError(mint_req, f"User intentionally sent too little lovelace, avoiding txn processing to avoid DDoS")
+        num_mints_requested = self.__calculate_num_mints_requested(mint_req)
 
         utxos = self.blockfrost_api.get_tx_utxos(mint_req.hash)
         utxo_inputs = utxos['inputs']
@@ -106,32 +209,25 @@ class NftVendingMachine(object):
         wl_availability = self.mint.whitelist.available(wl_resources)
         num_mints = min(self.single_vend_max, len(available_mints), num_mints_requested, wl_availability)
 
-        if not self.mint.price and self.max_rebate > lovelace_bal.lovelace:
-            print(f"Payment of {lovelace_bal.lovelace} might cause minUTxO error for {num_mints} NFTs, refunding instead...")
-            num_mints = 0
-
-        gross_profit = num_mints * self.mint.price
-        dev_fee = num_mints * self.mint.dev_fee
-        change = lovelace_bal.lovelace - gross_profit
-
+        bonuses = 0
         if self.mint.bogo:
-            bonuses = self.mint.bogo.determine_bonuses(num_mints_requested)
-            print(f"Bonus of {bonuses} NFTs determined based on {num_mints_requested}")
-            num_mints = min(self.single_vend_max, len(available_mints), (num_mints + bonuses))
+            eligible_bonuses = self.mint.bogo.determine_bonuses(num_mints_requested)
+            num_mints_plus_bonus = min(self.single_vend_max, len(available_mints), (num_mints + eligible_bonuses))
+            print(f"Bonus of {eligible_bonuses} NFTs determined based on {num_mints_requested} (can mint {num_mints_plus_bonus} in total)")
+            bonuses = num_mints_plus_bonus - num_mints
+            num_mints += bonuses
 
         print(f"Beginning to mint {num_mints} NFTs to send to address {input_addr}")
         txn_id = int(time.time())
         nft_metadata_file = self.__lock_and_merge(available_mints, num_mints, output_dir, locked_subdir, metadata_subdir, txn_id)
         nft_policy_map = self.__get_policy_name_map(nft_metadata_file)
 
-        all_names = [name for name_lst in nft_policy_map.values() for name in name_lst]
-        total_name_chars = sum([len(name) for name in all_names])
-        user_rebate = Mint.RebateCalculator.calculate_rebate_for(len(nft_policy_map.keys()), len(all_names), total_name_chars) if self.mint.price else 0
-        net_profit = gross_profit - dev_fee - user_rebate
-        print(f"Minimum rebate to user is {user_rebate}, net profit to vault is {net_profit}")
+        fee = 0
+        pricing_breakdown = self.__get_pricing_breakdown(input_addr, (num_mints - bonuses), nft_policy_map, mint_req, fee)
+        print(f"Anticipated pricing breakdown: {pricing_breakdown}")
 
         tx_ins = [f"--tx-in {mint_req.hash}#{mint_req.ix}"]
-        tx_outs = self.__get_tx_out_args(input_addr, user_rebate + change, nft_policy_map, net_profit, dev_fee)
+        tx_outs = self.__get_tx_out_args(pricing_breakdown)
         mint_build_tmp = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, 0, nft_metadata_file, self.mint, nft_policy_map, self.script_map)
 
         tx_in_count = len(tx_ins)
@@ -141,16 +237,10 @@ class NftVendingMachine(object):
             signers.extend(self.mint.sign_keys)
         fee = self.cardano_cli.calculate_min_fee(mint_build_tmp, tx_in_count, tx_out_count, len(signers))
 
-        if net_profit:
-            net_profit = net_profit - fee
-        else:
-            change = change - fee
+        pricing_breakdown = self.__get_pricing_breakdown(input_addr, (num_mints - bonuses), nft_policy_map, mint_req, fee)
+        print(f"Final pricing breakdown: {pricing_breakdown}")
 
-        final_change = user_rebate + change
-        if (final_change and (final_change < Utxo.MIN_UTXO_VALUE)) or (net_profit and (net_profit < Utxo.MIN_UTXO_VALUE)):
-            raise BadUtxoError(mint_req, f"UTxO left change of {change}, and net_profit of {net_profit}, causing a minUTxO error")
-
-        tx_outs = self.__get_tx_out_args(input_addr, final_change, nft_policy_map, net_profit, dev_fee)
+        tx_outs = self.__get_tx_out_args(pricing_breakdown)
         mint_build = self.cardano_cli.build_raw_mint_txn(output_dir, txn_id, tx_ins, tx_outs, fee, nft_metadata_file, self.mint, nft_policy_map, self.script_map)
         mint_signed = self.cardano_cli.sign_txn(signers, mint_build)
         self.mint.whitelist.consume(wl_resources, num_mints)
@@ -168,7 +258,7 @@ class NftVendingMachine(object):
                 print(f"UNRECOVERABLE UTXO ERROR\n{e.utxo}\n^--- REQUIRES INVESTIGATION")
                 print(traceback.format_exc())
             except Exception as e:
-                print(f"WARNING: Uncaught exception for {mint_req}, added to exclusions (RETRY WILL NOT BE ATTEMPTED)")
+                print(f"ERROR: Uncaught exception for {mint_req}, added to exclusions (RETRY WILL NOT BE ATTEMPTED)")
                 print(traceback.format_exc())
                 time.sleep(NftVendingMachine.__ERROR_WAIT)
 
@@ -177,8 +267,9 @@ class NftVendingMachine(object):
         if self.payment_addr == self.profit_addr:
             raise ValueError(f"Payment address and profit address ({self.payment_addr}) cannot be the same!")
         self.max_rebate = self.__max_rebate_for(self.mint.validated_names)
-        if self.mint.price and self.mint.price < (self.max_rebate + self.mint.dev_fee + Utxo.MIN_UTXO_VALUE):
-            raise ValueError(f"Price of {self.mint.price} with dev fee of {self.mint.dev_fee} could lead to a minUTxO error due to rebates")
+        for price in self.mint.prices:
+            if price.lovelace and price.policy == Balance.LOVELACE_POLICY and price.lovelace < (self.max_rebate + self.mint.dev_fee + Utxo.MIN_UTXO_VALUE):
+                raise ValueError(f"Price of {price.lovelace} lovelace with dev fee of {self.mint.dev_fee} could lead to a minUTxO error due to rebates")
         if not os.path.exists(self.payment_sign_key):
             raise ValueError(f"Payment signing key file '{self.payment_sign_key}' not found on filesystem")
         expected_payment_addr = self.cardano_cli.build_addr(self.payment_sign_key, self.mainnet)

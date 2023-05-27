@@ -19,6 +19,7 @@ from test_utils.metadata import asset_filename, asset_name_hex, create_asset_fil
 from test_utils.process import launch_py3_subprocess
 
 from cardano.wt.mint import Mint
+from cardano.wt.utxo import Balance
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.wallet_whitelist import WalletWhitelist
 
@@ -26,6 +27,7 @@ DEV_FEE_ADDR = None
 DEV_FEE_AMT = 0
 EXPIRATION = 87654321
 MINT_PRICE = 10000000
+MINT_PRICES = [Balance(MINT_PRICE, Balance.LOVELACE_POLICY)]
 NFT_REBATE_MAX = 2000000
 PADDING = 500000
 SINGLE_VEND_MAX = 10
@@ -64,7 +66,7 @@ def test_validate_requires_whitelist_dir_created(request, vm_test_config):
     whitelist = WalletWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
     sign_key = data_file_path(request, os.path.join('sign_keys', 'dummy.skey'))
-    mint = Mint(MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, [simple_script], [sign_key], whitelist)
+    mint = Mint(MINT_PRICES, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, [simple_script], [sign_key], whitelist)
     try:
         mint.validate()
         assert False, "Successfully validated mint without a whitelist directory"
@@ -76,7 +78,7 @@ def test_validate_requires_consumed_dir_created(request, vm_test_config):
     whitelist = WalletWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
     sign_key = data_file_path(request, os.path.join('sign_keys', 'dummy.skey'))
-    mint = Mint(MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, [simple_script], [sign_key], whitelist)
+    mint = Mint(MINT_PRICES, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, [simple_script], [sign_key], whitelist)
     try:
         mint.validate()
         assert False, "Successfully validated mint without a whitelist directory"
@@ -133,7 +135,7 @@ def test_rejects_if_no_metadata(request, vm_test_config, blockfrost_api, cardano
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -240,7 +242,7 @@ def test_rejects_if_no_msg_in_metadata(request, vm_test_config, blockfrost_api, 
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -347,7 +349,7 @@ def test_rejects_if_msg_empty_metadata(request, vm_test_config, blockfrost_api, 
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -454,7 +456,7 @@ def test_rejects_if_msg_stakesign_empty(request, vm_test_config, blockfrost_api,
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -571,7 +573,7 @@ def test_rejects_if_address_signed_but_not_whitelisted(request, vm_test_config, 
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -690,7 +692,7 @@ def test_rejects_if_stake_signed_but_not_whitelisted(request, vm_test_config, bl
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -803,7 +805,7 @@ def test_rejects_if_wrong_message_signed(request, vm_test_config, blockfrost_api
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -921,7 +923,7 @@ def test_rejects_if_wrong_payment_address_signed(request, vm_test_config, blockf
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1032,7 +1034,7 @@ def test_successfully_mints_signed_stake_key_once(request, vm_test_config, block
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1216,7 +1218,7 @@ def test_rejects_if_stringified_msg_not_a_list(request, vm_test_config, blockfro
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1329,7 +1331,7 @@ def test_supports_whitelisted_unstaked_addresses(request, vm_test_config, blockf
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1523,7 +1525,7 @@ def test_rejects_if_any_payment_addresses_not_included(request, vm_test_config, 
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1646,7 +1648,7 @@ def test_avoids_duplicates_with_diff_payment_key(request, vm_test_config, blockf
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1852,7 +1854,7 @@ def test_avoids_duplicates_with_linked_stake_keys(request, vm_test_config, block
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -2059,7 +2061,7 @@ def test_skips_non_whitelisted_linked_stake_keys(request, vm_test_config, blockf
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -2263,7 +2265,7 @@ def test_should_allow_multiple_txns_for_multiple_slots(request, vm_test_config, 
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,

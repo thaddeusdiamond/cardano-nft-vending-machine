@@ -21,7 +21,7 @@ from test_utils.process import launch_py3_subprocess
 
 from cardano.wt.mint import Mint
 from cardano.wt.nft_vending_machine import NftVendingMachine
-from cardano.wt.utxo import Utxo
+from cardano.wt.utxo import Utxo, Balance
 from cardano.wt.whitelist.asset_whitelist import SingleUseWhitelist, UnlimitedWhitelist
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
 
@@ -86,7 +86,7 @@ def test_concurrent_wallet_usage(request, vm_test_config, blockfrost_api, cardan
             get_network_magic()
     )
     mint = Mint(
-            mint_price,
+            [Balance(mint_price, Balance.LOVELACE_POLICY)],
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -213,7 +213,7 @@ def test_concurrent_wallet_usage(request, vm_test_config, blockfrost_api, cardan
             minted_assets = 0
             for buyer_utxo in buyer_utxos:
                 for balance in buyer_utxo.balances:
-                    if balance.policy == Utxo.Balance.LOVELACE_POLICY:
+                    if balance.policy == Balance.LOVELACE_POLICY:
                         drain_amt += balance.lovelace
                     else:
                         minted_assets += 1
@@ -302,7 +302,7 @@ def test_do_the_drain(request, vm_test_config, blockfrost_api, cardano_cli, scal
             minted_assets = 0
             for buyer_utxo in buyer_utxos:
                 for balance in buyer_utxo.balances:
-                    if balance.policy == Utxo.Balance.LOVELACE_POLICY:
+                    if balance.policy == Balance.LOVELACE_POLICY:
                         drain_amt += balance.lovelace
                     else:
                         minted_assets += 1

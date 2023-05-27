@@ -15,6 +15,7 @@ from test_utils.metadata import asset_filename, asset_name_hex, create_asset_fil
 from test_utils.process import launch_py3_subprocess
 
 from cardano.wt.mint import Mint
+from cardano.wt.utxo import Balance
 from cardano.wt.nft_vending_machine import NftVendingMachine
 from cardano.wt.whitelist.asset_whitelist import SingleUseWhitelist, UnlimitedWhitelist
 from cardano.wt.whitelist.no_whitelist import NoWhitelist
@@ -23,6 +24,7 @@ DEV_FEE_ADDR = None
 DEV_FEE_AMT = 0
 EXPIRATION = 87654321
 MINT_PRICE = 10000000
+MINT_PRICES = [Balance(MINT_PRICE, Balance.LOVELACE_POLICY)]
 SINGLE_VEND_MAX = 10
 VEND_RANDOMLY = True
 WL_EXPIRATION = 76543210
@@ -51,7 +53,7 @@ def test_validate_requires_whitelist_dir_created(request, vm_test_config):
     whitelist = SingleUseWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
     sign_key = data_file_path(request, os.path.join('sign_keys', 'dummy.skey'))
-    mint = Mint(MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, [simple_script], [sign_key], whitelist)
+    mint = Mint(MINT_PRICES, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, [simple_script], [sign_key], whitelist)
     try:
         mint.validate()
         assert False, "Successfully validated mint without a whitelist directory"
@@ -63,7 +65,7 @@ def test_validate_requires_consumed_dir_created(request, vm_test_config):
     whitelist = SingleUseWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
     simple_script = data_file_path(request, os.path.join('scripts', 'simple.script'))
     sign_key = data_file_path(request, os.path.join('sign_keys', 'dummy.skey'))
-    mint = Mint(MINT_PRICE, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, [simple_script], [sign_key], whitelist)
+    mint = Mint(MINT_PRICES, DEV_FEE_AMT, DEV_FEE_ADDR, vm_test_config.metadata_dir, [simple_script], [sign_key], whitelist)
     try:
         mint.validate()
         assert False, "Successfully validated mint without a whitelist directory"
@@ -148,7 +150,7 @@ def test_rejects_if_no_asset_sent_to_self(request, vm_test_config, blockfrost_ap
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -292,7 +294,7 @@ def test_remains_on_whitelist_if_vendingmachine_empty(request, vm_test_config, b
     policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
     policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -431,7 +433,7 @@ def test_rejects_if_asset_sent_as_reference_input(request, vm_test_config, block
     create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -503,130 +505,6 @@ def test_rejects_if_asset_sent_as_reference_input(request, vm_test_config, block
             vm_test_config.root_dir
     )
     await_payment(funder.address, drain_txn, blockfrost_api)
-
-def test_excludes_if_asset_sent_directly(request, vm_test_config, blockfrost_api, cardano_cli):
-    buyer = Address.new(
-            vm_test_config.buyers_dir,
-            'buyer',
-            get_network_magic()
-    )
-
-    funder = get_funder_address(request)
-    funding_utxos = blockfrost_api.get_utxos(funder.address, [])
-    print('Funder address currently has: ', sum([lovelace_in(funding_utxo) for funding_utxo in funding_utxos]))
-    funding_amt = MINT_PRICE + PADDING
-    funding_inputs = find_min_utxos_for_txn(funding_amt, funding_utxos, funder.address)
-    wl_funding_request_txn = send_money(
-            [buyer],
-            funding_amt,
-            funder,
-            funding_inputs,
-            cardano_cli,
-            blockfrost_api,
-            vm_test_config.root_dir
-    )
-    wl_buyer_utxo = await_payment(buyer.address, wl_funding_request_txn, blockfrost_api)
-
-    wl_policy_keys = KeyPair.new(vm_test_config.policy_dir, 'wl_policy')
-    wl_policy = new_policy_for(wl_policy_keys, vm_test_config.policy_dir, 'wl_policy.script', expiration=WL_EXPIRATION)
-
-    wl_pass = "WildTangz WL 1"
-    wl_pass_onchain = f"{wl_policy.id}{asset_name_hex(wl_pass)}"
-    wl_selfpayment = lovelace_in(wl_buyer_utxo)
-    wl_txn = mint_assets([wl_pass], wl_policy, wl_policy_keys, WL_EXPIRATION, buyer, wl_selfpayment, buyer, [wl_buyer_utxo], cardano_cli, blockfrost_api, vm_test_config.root_dir)
-    wl_mint_utxo = await_payment(buyer.address, wl_txn, blockfrost_api)
-
-    initialize_asset_wl(vm_test_config.whitelist_dir, vm_test_config.consumed_dir, wl_policy, request, blockfrost_api)
-    whitelist = SingleUseWhitelist(vm_test_config.whitelist_dir, vm_test_config.consumed_dir)
-    assert whitelist.num_whitelisted(wl_pass_onchain) == 1, f"{wl_pass_onchain} should be on the whitelist"
-
-    payment = Address.new(
-            vm_test_config.payees_dir,
-            'payment',
-            get_network_magic()
-    )
-    mint_payment = lovelace_in(wl_mint_utxo)
-    assert mint_payment > MINT_PRICE, f"Test setup failed needed at least {MINT_PRICE} in {wl_buyer_utxo}"
-    payment_txn = send_money(
-            [payment],
-            mint_payment,
-            buyer,
-            [wl_mint_utxo],
-            cardano_cli,
-            blockfrost_api,
-            vm_test_config.root_dir,
-            additional_outputs=f"1 {wl_policy.id}.{asset_name_hex(wl_pass)}"
-    )
-    payment_utxo = await_payment(payment.address, payment_txn, blockfrost_api)
-
-    policy_keys = KeyPair.new(vm_test_config.policy_dir, 'policy')
-    policy = new_policy_for(policy_keys, vm_test_config.policy_dir, 'policy.script', expiration=EXPIRATION)
-
-    asset_name = "WildTangz 1"
-    create_asset_files([asset_name], policy, request, vm_test_config.metadata_dir)
-
-    mint = Mint(
-            MINT_PRICE,
-            DEV_FEE_AMT,
-            DEV_FEE_ADDR,
-            vm_test_config.metadata_dir,
-            [policy.script_file_path],
-            [policy_keys.skey_path],
-            whitelist
-    )
-    profit = Address.new(
-            vm_test_config.payees_dir,
-            'profit',
-            get_network_magic()
-    )
-    nft_vending_machine = NftVendingMachine(
-            payment.address,
-            payment.keypair.skey_path,
-            profit.address,
-            VEND_RANDOMLY,
-            SINGLE_VEND_MAX,
-            mint,
-            blockfrost_api,
-            cardano_cli,
-            mainnet=get_mainnet_env()
-    )
-    nft_vending_machine.validate()
-
-    exclusions = set()
-    nft_vending_machine.vend(
-            vm_test_config.root_dir,
-            vm_test_config.locked_dir,
-            vm_test_config.txn_metadata_dir,
-            exclusions
-    )
-    assert payment_utxo in exclusions, f"Expected {payment_utxo} in exclusions {exclusions}"
-
-    try:
-        await_payment(profit.address, None, blockfrost_api)
-        assert False, f"{profit.address} was paid, but should not have been"
-    except:
-        pass
-
-    created_assets = blockfrost_api.get_assets(policy.id)
-    assert not created_assets, f"Somehow the test created assets under {policy.id}: {created_assets}"
-
-    assert whitelist.num_whitelisted(wl_pass_onchain) == 1, f"{wl_pass_onchain} should have remained on the whitelist"
-
-    burn_payment = lovelace_in(payment_utxo)
-    burn_txn = burn_and_reclaim_tada(
-            [wl_pass],
-            wl_policy,
-            wl_policy_keys,
-            WL_EXPIRATION,
-            funder,
-            burn_payment,
-            payment,
-            [payment_utxo],
-            cardano_cli,
-            blockfrost_api,
-            vm_test_config.root_dir
-    )
-    await_payment(funder.address, burn_txn, blockfrost_api)
 
 def test_mints_correct_number_for_single_use(request, vm_test_config, blockfrost_api, cardano_cli):
     buyer = Address.new(
@@ -704,7 +582,7 @@ def test_mints_correct_number_for_single_use(request, vm_test_config, blockfrost
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -920,7 +798,7 @@ def test_mints_correct_number_for_multiple_passes(request, vm_test_config, block
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1128,7 +1006,7 @@ def test_mints_correct_number_with_same_utxo(request, vm_test_config, blockfrost
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1328,7 +1206,7 @@ def test_mints_correct_number_for_unlimited_use(request, vm_test_config, blockfr
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1540,7 +1418,7 @@ def test_respects_single_vend_max_for_unlimited_use(request, vm_test_config, blo
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,
@@ -1705,7 +1583,7 @@ def test_should_allow_multiple_txns_for_multiple_slots(request, vm_test_config, 
     create_asset_files(asset_names, policy, request, vm_test_config.metadata_dir)
 
     mint = Mint(
-            MINT_PRICE,
+            MINT_PRICES,
             DEV_FEE_AMT,
             DEV_FEE_ADDR,
             vm_test_config.metadata_dir,

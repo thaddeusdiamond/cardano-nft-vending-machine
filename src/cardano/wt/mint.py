@@ -2,7 +2,7 @@ import json
 import math
 import os
 
-from cardano.wt.utxo import Utxo
+from cardano.wt.utxo import Utxo, Balance
 
 """
 Representation of the current minting process.
@@ -41,8 +41,8 @@ class Mint(object):
                     return validator[key]
         return None
 
-    def __init__(self, price, dev_fee, dev_addr, nfts_dir, scripts, sign_keys, whitelist, bogo=None):
-        self.price = price
+    def __init__(self, prices, dev_fee, dev_addr, nfts_dir, scripts, sign_keys, whitelist, bogo=None):
+        self.prices = prices
         self.dev_fee = dev_fee
         self.dev_addr = dev_addr
         self.nfts_dir = nfts_dir
@@ -61,8 +61,20 @@ class Mint(object):
             raise ValueError(f"Thank you for offering to pay your dev {self.dev_fee} but the minUTxO on Cardano is {Utxo.MIN_UTXO_VALUE} lovelace")
         if self.dev_fee and not self.dev_addr:
             raise ValueError(f"Thank you for offering to pay your dev {self.dev_fee} but you did not provide a dev address")
-        if self.price and self.price < Mint._MIN_PRICE:
-            raise ValueError(f"Minimum mint price is {Mint._MIN_PRICE}, you entered {self.price}")
+        validated_price_policies = []
+        if not self.prices:
+            raise ValueError("Must specify at least one valid mint price, even if 0 ADA for free mint")
+        for price in self.prices:
+            if price.policy != Balance.LOVELACE_POLICY:
+                if len(price.policy) <= Mint._POLICY_LEN or price.policy[Mint._POLICY_LEN] != '.':
+                    raise ValueError(f"Price unit '{price.policy}' does not look like a valid unit name")
+            if price.policy == Balance.LOVELACE_POLICY and price.lovelace and price.lovelace < Mint._MIN_PRICE:
+                raise ValueError(f"Minimum mint price is {Mint._MIN_PRICE}, you entered {price.lovelace} {Balance.LOVELACE_POLICY}")
+            if not price.lovelace and price.policy != Balance.LOVELACE_POLICY:
+                raise ValueError(f"Detected invalid zero price for non-ADA policy '{price.policy}'")
+            if price.policy in validated_price_policies:
+                raise ValueError(f"Duplicate price detected for policy '{price.policy}', aborting")
+            validated_price_policies.append(price.policy)
         validated_names = []
         for filename in os.listdir(self.nfts_dir):
             with open(os.path.join(self.nfts_dir, filename), 'r') as file:

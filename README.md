@@ -34,7 +34,8 @@ The library consists of several Python objects representing the mint process.  T
     whitelist = SingleUseWhitelist('/path/to/whitelisted/assets/directory')
 
     # The Mint object below represents your Mint and specifies price, and developer fee in Lovelace (both can be 0)
-    mint = Mint(10000000, 1000000, 'addr1_developer', '/path/to/nft/json/metadata', '/path/to/mint/script', '/path/to/mint.skey', whitelist)
+    price = Balance(10000000, Balance.LOVELACE_POLICY)
+    mint = Mint([price], 1000000, 'addr1_developer', '/path/to/nft/json/metadata', '/path/to/mint/script', '/path/to/mint.skey', whitelist)
 
     # Blockfrost is used in the code to validate where the UTXO sent to the payment address came from
     blockfrost_api = BlockfrostApi('<BLOCKFROST_PROJ_ID>', mainnet=True)
@@ -58,7 +59,7 @@ There is a sample vending machine script that is included in the ``src/`` direct
                 --payment-addr <PAYMENT_ADDR> \
                 --payment-sign-key /FULL/PATH/TO/payment.skey \
                 --profit-addr <PROFIT_ADDR> \
-                [--mint-price <PRICE_LOVELACE> | --free-mint] \
+                (--mint-price <PRICE> <POLICY_ID>)+ \
                 --mint-script /FULL/PATH/TO/policy.script \
                 --mint-sign-key /FULL/PATH/TO/policy.skey \
                 --blockfrost-project <BLOCKFROST_PROJECT_ID> \

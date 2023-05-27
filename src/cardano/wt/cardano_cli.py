@@ -27,7 +27,7 @@ class CardanoCli(object):
         print(f'[STDERR] {err}')
         return out
 
-    def named_assets_str(nft_policy_map):
+    def __named_assets_str(nft_policy_map):
         named_assets = []
         for policy in nft_policy_map:
             for nft_name in nft_policy_map[policy]:
@@ -47,7 +47,7 @@ class CardanoCli(object):
     def build_raw_mint_txn(self, output_dir, txn_id, tx_in_args, tx_out_args, fee, metadata_json_file, mint, nft_policy_map, scripts_map):
         mint_args = []
         if nft_policy_map:
-            named_asset_str = CardanoCli.named_assets_str(nft_policy_map)
+            named_asset_str = CardanoCli.__named_assets_str(nft_policy_map)
             mint_args.append(f"--mint=\"{named_asset_str}\"")
             mint_args.extend([f"--minting-script-file {scripts_map[script]}" for script in scripts_map if script in nft_policy_map])
         if mint.initial_slot:
